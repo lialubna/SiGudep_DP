@@ -62,25 +62,37 @@ const defaultConfigs: AppConfig = {
   AlamatSekretariat: "Jl. Pendidikan No. 10, Jakarta"
 };
 
-const DB_KEY = "sigudep_offline_db";
+const CONFIG_KEY = "sigudep_configs";
 
 let dbCache: Database | null = null;
 
-function getLocalDBOnly(): Database {
-  const cached = localStorage.getItem(DB_KEY);
+function getLocalConfigOnly(): AppConfig {
+  const cached = localStorage.getItem(CONFIG_KEY);
   if (cached) {
     try {
-      const parsed = JSON.parse(cached);
-      if (!parsed.prestasi) {
-        parsed.prestasi = [];
-      }
-      return parsed;
+      return JSON.parse(cached);
     } catch (e) {
-      console.error("Gagal membaca database offline:", e);
+      console.error("Gagal membaca konfigurasi lokal:", e);
     }
   }
-  const initDb: Database = {
-    configs: defaultConfigs,
+  return defaultConfigs;
+}
+
+function saveLocalConfigOnly(config: AppConfig) {
+  localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+}
+
+function saveDB(db: Database) {
+  dbCache = db;
+  saveLocalConfigOnly(db.configs);
+}
+
+export async function refreshDBFromServer(): Promise<Database> {
+  const localConfig = getLocalConfigOnly();
+  const scriptURL = localConfig.ScriptURL;
+
+  const initialDb: Database = {
+    configs: localConfig,
     users: [],
     pembina: [],
     peserta: [],
@@ -102,35 +114,44 @@ function getLocalDBOnly(): Database {
     log_aktivitas: [],
     prestasi: []
   };
-  localStorage.setItem(DB_KEY, JSON.stringify(initDb));
-  return initDb;
-}
-
-function saveDB(db: Database) {
-  dbCache = db;
-  localStorage.setItem(DB_KEY, JSON.stringify(db));
-}
-
-export async function refreshDBFromServer(): Promise<Database> {
-  const localDb = getLocalDBOnly();
-  const scriptURL = localDb.configs.ScriptURL;
 
   if (scriptURL && scriptURL.startsWith("https://script.google.com")) {
     try {
       const response = await fetch(`${scriptURL}?action=read`);
       if (response.ok) {
         const remoteDB = await response.json() as any;
-        if (remoteDB && remoteDB.configs) {
+        if (remoteDB) {
           const mergedDB: Database = {
-            ...localDb,
-            ...remoteDB
+            configs: {
+              ...localConfig,
+              ...(remoteDB.configs || {})
+            },
+            users: remoteDB.users || [],
+            pembina: remoteDB.pembina || [],
+            peserta: remoteDB.peserta || [],
+            master_sku: remoteDB.master_sku || [],
+            progress_sku: remoteDB.progress_sku || [],
+            tingkat: remoteDB.tingkat || [],
+            tkk: remoteDB.tkk || [],
+            absensi_peserta: remoteDB.absensi_peserta || [],
+            absensi_pembina: remoteDB.absensi_pembina || [],
+            jadwal: remoteDB.jadwal || [],
+            kalender: remoteDB.kalender || [],
+            materi: remoteDB.materi || [],
+            pengumuman: remoteDB.pengumuman || [],
+            notifikasi: remoteDB.notifikasi || [],
+            inventaris: remoteDB.inventaris || [],
+            refleksi_siswa: remoteDB.refleksi_siswa || [],
+            refleksi_pembina: remoteDB.refleksi_pembina || [],
+            penilaian_sikap: remoteDB.penilaian_sikap || [],
+            log_aktivitas: remoteDB.log_aktivitas || [],
+            prestasi: remoteDB.prestasi || []
           };
           mergedDB.configs.ScriptURL = scriptURL;
-          mergedDB.configs.SpreadsheetID = localDb.configs.SpreadsheetID || mergedDB.configs.SpreadsheetID;
-          mergedDB.configs.FolderDriveID = localDb.configs.FolderDriveID || mergedDB.configs.FolderDriveID;
+          mergedDB.configs.SpreadsheetID = localConfig.SpreadsheetID || mergedDB.configs.SpreadsheetID;
+          mergedDB.configs.FolderDriveID = localConfig.FolderDriveID || mergedDB.configs.FolderDriveID;
           
           dbCache = mergedDB;
-          localStorage.setItem(DB_KEY, JSON.stringify(dbCache));
           return dbCache;
         }
       }
@@ -140,7 +161,9 @@ export async function refreshDBFromServer(): Promise<Database> {
   }
   
   if (!dbCache) {
-    dbCache = localDb;
+    dbCache = initialDb;
+  } else {
+    dbCache.configs = localConfig;
   }
   return dbCache;
 }
@@ -183,7 +206,7 @@ function writeLog(db: Database, userId: string, nama: string, role: string, modu
 
 // Background syncing helper to Google Sheets
 async function syncTableToGoogleSheets(table: keyof Database): Promise<void> {
-  const db = await await getDB();
+  const db = await getDB();
   const scriptURL = db.configs.ScriptURL;
   if (!scriptURL || !scriptURL.startsWith("https://script.google.com")) {
     return;
@@ -216,7 +239,7 @@ async function syncTableToGoogleSheets(table: keyof Database): Promise<void> {
 
 // Upload base64 files directly to Google Drive via Apps Script
 async function uploadToGoogleDriveIfBase64(base64Data: string, fileName: string): Promise<string> {
-  const db = await await getDB();
+  const db = await getDB();
   const scriptURL = db.configs.ScriptURL;
   const folderId = db.configs.FolderDriveID;
   if (!scriptURL || !scriptURL.startsWith("https://script.google.com")) {
@@ -265,7 +288,7 @@ export const API = {
   // Auth Login
   async login(username: string, password: string): Promise<{ success: boolean; user: any; message?: string }> {
     await refreshDBFromServer();
-    const db = await await getDB();
+    const db = await getDB();
     const user = db.users.find(u => u.Username.toLowerCase() === username.toLowerCase());
     if (!user) {
       return { success: false, user: null, message: "Username atau password salah." };
@@ -305,11 +328,11 @@ export const API = {
 
   // Config
   async getConfig(): Promise<AppConfig> {
-    const db = await await getDB();
+    const db = await getDB();
     return db.configs;
   },
   async updateConfig(config: Partial<AppConfig>): Promise<{ success: boolean; configs: AppConfig }> {
-    const db = await await getDB();
+    const db = await getDB();
     const oldScriptURL = db.configs.ScriptURL;
     const updated = { ...config };
 
@@ -353,7 +376,7 @@ export const API = {
     return { success: true, configs: db.configs };
   },
   async syncGoogleSheets(): Promise<{ success: boolean; message: string; configs?: AppConfig }> {
-    const db = await await getDB();
+    const db = await getDB();
     const scriptURL = db.configs.ScriptURL;
     if (!scriptURL || !scriptURL.startsWith("https://script.google.com")) {
       throw new Error("Apps Script Web App URL belum dikonfigurasi di pengaturan sistem!");
@@ -366,7 +389,7 @@ export const API = {
     
     const remoteDB = await response.json() as any;
     if (remoteDB && remoteDB.configs) {
-      const localDB = await await getDB();
+      const localDB = await getDB();
       const mergedDB = {
         ...localDB,
         ...remoteDB
@@ -381,7 +404,7 @@ export const API = {
     throw new Error("Format respons Google Sheets tidak valid.");
   },
   async initializeGoogleSheets(): Promise<{ success: boolean; message: string }> {
-    const db = await await getDB();
+    const db = await getDB();
     const scriptURL = db.configs.ScriptURL;
     if (!scriptURL || !scriptURL.startsWith("https://script.google.com")) {
       throw new Error("Apps Script Web App URL belum dikonfigurasi di pengaturan sistem!");
@@ -407,11 +430,11 @@ export const API = {
 
   // Users
   async getUsers(): Promise<User[]> {
-    const db = await await getDB();
+    const db = await getDB();
     return db.users || [];
   },
   async createUser(user: Partial<User>): Promise<{ success: boolean; user: User }> {
-    const db = await await getDB();
+    const db = await getDB();
     const newId = user.UserID || "usr-" + generateUUID().substring(0, 8);
     const password = user.PasswordHash || "123456";
     const hashedPassword = await hashPassword(password);
@@ -436,7 +459,7 @@ export const API = {
     return { success: true, user: newUser };
   },
   async updateUser(id: string, user: Partial<User>): Promise<{ success: boolean; user: User }> {
-    const db = await await getDB();
+    const db = await getDB();
     const index = db.users.findIndex(u => u.UserID === id);
     if (index === -1) throw new Error("Pengguna tidak ditemukan.");
     
@@ -457,7 +480,7 @@ export const API = {
     return { success: true, user: updated };
   },
   async deleteUser(id: string): Promise<{ success: boolean }> {
-    const db = await await getDB();
+    const db = await getDB();
     db.users = db.users.filter(u => u.UserID !== id);
     saveDB(db);
     await syncTableToGoogleSheets("users");
@@ -466,11 +489,11 @@ export const API = {
 
   // Pembina
   async getPembina(): Promise<Pembina[]> {
-    const db = await await getDB();
+    const db = await getDB();
     return db.pembina || [];
   },
   async createPembina(data: Partial<Pembina>): Promise<{ success: boolean; pembina: Pembina }> {
-    const db = await await getDB();
+    const db = await getDB();
     const newId = "pem-" + generateUUID().substring(0, 8);
     const newPembina: Pembina = {
       PembinaID: newId,
@@ -515,7 +538,7 @@ export const API = {
     return { success: true, pembina: newPembina };
   },
   async updatePembina(id: string, data: Partial<Pembina>): Promise<{ success: boolean; pembina: Pembina }> {
-    const db = await await getDB();
+    const db = await getDB();
     const index = db.pembina.findIndex(p => p.PembinaID === id);
     if (index === -1) throw new Error("Pembina tidak ditemukan.");
     
@@ -546,7 +569,7 @@ export const API = {
     return { success: true, pembina: updated };
   },
   async deletePembina(id: string): Promise<{ success: boolean }> {
-    const db = await await getDB();
+    const db = await getDB();
     db.pembina = db.pembina.filter(p => p.PembinaID !== id);
     db.users = db.users.filter(u => u.PembinaID !== id);
     saveDB(db);
@@ -559,11 +582,11 @@ export const API = {
 
   // Peserta
   async getPeserta(): Promise<Peserta[]> {
-    const db = await await getDB();
+    const db = await getDB();
     return db.peserta || [];
   },
   async createPeserta(data: Partial<Peserta>): Promise<{ success: boolean; peserta: Peserta }> {
-    const db = await await getDB();
+    const db = await getDB();
     const newId = "pes-" + generateUUID().substring(0, 8);
     let fotoUrl = data.Foto || "";
     if (fotoUrl && fotoUrl.startsWith("data:image/")) {
@@ -625,7 +648,7 @@ export const API = {
     return { success: true, peserta: newPeserta };
   },
   async updatePeserta(id: string, data: Partial<Peserta>): Promise<{ success: boolean; peserta: Peserta }> {
-    const db = await await getDB();
+    const db = await getDB();
     const index = db.peserta.findIndex(p => p.PesertaID === id);
     if (index === -1) throw new Error("Peserta tidak ditemukan.");
     
@@ -663,7 +686,7 @@ export const API = {
     return { success: true, peserta: updated };
   },
   async deletePeserta(id: string): Promise<{ success: boolean }> {
-    const db = await await getDB();
+    const db = await getDB();
     db.peserta = db.peserta.filter(p => p.PesertaID !== id);
     db.users = db.users.filter(u => u.PesertaID !== id);
     saveDB(db);
@@ -676,11 +699,11 @@ export const API = {
 
   // Master SKU
   async getMasterSKU(): Promise<MasterSKU[]> {
-    const db = await await getDB();
+    const db = await getDB();
     return db.master_sku || [];
   },
   async createMasterSKU(data: Partial<MasterSKU>): Promise<{ success: boolean; sku: MasterSKU }> {
-    const db = await await getDB();
+    const db = await getDB();
     const newId = "sku-" + generateUUID().substring(0, 8);
     const newSku: MasterSKU = {
       SkuID: newId,
@@ -698,7 +721,7 @@ export const API = {
     return { success: true, sku: newSku };
   },
   async updateMasterSKU(id: string, data: Partial<MasterSKU>): Promise<{ success: boolean; sku: MasterSKU }> {
-    const db = await await getDB();
+    const db = await getDB();
     const index = db.master_sku.findIndex(s => s.SkuID === id);
     if (index === -1) throw new Error("Butir SKU tidak ditemukan.");
     const updated = { ...db.master_sku[index], ...data };
@@ -708,7 +731,7 @@ export const API = {
     return { success: true, sku: updated };
   },
   async deleteMasterSKU(id: string): Promise<{ success: boolean }> {
-    const db = await await getDB();
+    const db = await getDB();
     db.master_sku = db.master_sku.filter(s => s.SkuID !== id);
     saveDB(db);
     await syncTableToGoogleSheets("master_sku");
@@ -717,11 +740,11 @@ export const API = {
 
   // Progress SKU
   async getProgressSKU(): Promise<ProgressSKU[]> {
-    const db = await await getDB();
+    const db = await getDB();
     return db.progress_sku || [];
   },
   async saveProgressSKU(data: Partial<ProgressSKU>): Promise<{ success: boolean; progress: ProgressSKU }> {
-    const db = await await getDB();
+    const db = await getDB();
     const existingIndex = db.progress_sku.findIndex(
       p => p.PesertaID === data.PesertaID && p.SkuID === data.SkuID
     );
@@ -751,11 +774,11 @@ export const API = {
 
   // TKK Awards
   async getTKK(): Promise<TKKAward[]> {
-    const db = await await getDB();
+    const db = await getDB();
     return db.tkk || [];
   },
   async awardTKK(data: Partial<TKKAward>): Promise<{ success: boolean; tkk: TKKAward }> {
-    const db = await await getDB();
+    const db = await getDB();
     const newId = "tkk-" + generateUUID().substring(0, 8);
     const newAward: TKKAward = {
       TKKID: newId,
@@ -774,7 +797,7 @@ export const API = {
     return { success: true, tkk: newAward };
   },
   async deleteTKK(id: string): Promise<{ success: boolean }> {
-    const db = await await getDB();
+    const db = await getDB();
     db.tkk = db.tkk.filter(t => t.TKKID !== id);
     saveDB(db);
     await syncTableToGoogleSheets("tkk");
@@ -783,11 +806,11 @@ export const API = {
 
   // Kenaikan Tingkat
   async getTingkat(): Promise<TingkatHistory[]> {
-    const db = await await getDB();
+    const db = await getDB();
     return db.tingkat || [];
   },
   async promoteTingkat(data: Partial<TingkatHistory>): Promise<{ success: boolean; tingkat: TingkatHistory }> {
-    const db = await await getDB();
+    const db = await getDB();
     const newId = "tkt-" + generateUUID().substring(0, 8);
     const newHistory: TingkatHistory = {
       TingkatID: newId,
@@ -821,11 +844,11 @@ export const API = {
 
   // Absensi
   async getAbsensiPeserta(): Promise<AbsensiPeserta[]> {
-    const db = await await getDB();
+    const db = await getDB();
     return db.absensi_peserta || [];
   },
   async recordAbsensiPeserta(data: Partial<AbsensiPeserta>): Promise<{ success: boolean; absensi: AbsensiPeserta }> {
-    const db = await await getDB();
+    const db = await getDB();
     const newId = "abp-" + generateUUID().substring(0, 8);
     const newAbsensi: AbsensiPeserta = {
       AbsensiID: newId,
@@ -844,11 +867,11 @@ export const API = {
     return { success: true, absensi: newAbsensi };
   },
   async getAbsensiPembina(): Promise<AbsensiPembina[]> {
-    const db = await await getDB();
+    const db = await getDB();
     return db.absensi_pembina || [];
   },
   async recordAbsensiPembina(data: Partial<AbsensiPembina>): Promise<{ success: boolean; absensi: AbsensiPembina }> {
-    const db = await await getDB();
+    const db = await getDB();
     const newId = "abm-" + generateUUID().substring(0, 8);
     const newAbsensi: AbsensiPembina = {
       AbsensiID: newId,
@@ -868,11 +891,11 @@ export const API = {
 
   // Jadwal
   async getJadwal(): Promise<Jadwal[]> {
-    const db = await await getDB();
+    const db = await getDB();
     return db.jadwal || [];
   },
   async createJadwal(data: Partial<Jadwal>): Promise<{ success: boolean; jadwal: Jadwal }> {
-    const db = await await getDB();
+    const db = await getDB();
     const newId = "jad-" + generateUUID().substring(0, 8);
     const newJadwal: Jadwal = {
       JadwalID: newId,
@@ -889,7 +912,7 @@ export const API = {
     return { success: true, jadwal: newJadwal };
   },
   async deleteJadwal(id: string): Promise<{ success: boolean }> {
-    const db = await await getDB();
+    const db = await getDB();
     db.jadwal = db.jadwal.filter(j => j.JadwalID !== id);
     saveDB(db);
     await syncTableToGoogleSheets("jadwal");
@@ -898,11 +921,11 @@ export const API = {
 
   // Kalender
   async getKalender(): Promise<KalenderKegiatan[]> {
-    const db = await await getDB();
+    const db = await getDB();
     return db.kalender || [];
   },
   async createKalender(data: Partial<KalenderKegiatan>): Promise<{ success: boolean; kalender: KalenderKegiatan }> {
-    const db = await await getDB();
+    const db = await getDB();
     const newId = "kal-" + generateUUID().substring(0, 8);
     const newKalender: KalenderKegiatan = {
       KalenderID: newId,
@@ -918,7 +941,7 @@ export const API = {
     return { success: true, kalender: newKalender };
   },
   async deleteKalender(id: string): Promise<{ success: boolean }> {
-    const db = await await getDB();
+    const db = await getDB();
     db.kalender = db.kalender.filter(k => k.KalenderID !== id);
     saveDB(db);
     await syncTableToGoogleSheets("kalender");
@@ -927,11 +950,11 @@ export const API = {
 
   // Materi
   async getMateri(): Promise<Materi[]> {
-    const db = await await getDB();
+    const db = await getDB();
     return db.materi || [];
   },
   async createMateri(data: Partial<Materi>): Promise<{ success: boolean; materi: Materi }> {
-    const db = await await getDB();
+    const db = await getDB();
     const newId = "mat-" + generateUUID().substring(0, 8);
     const newMateri: Materi = {
       MateriID: newId,
@@ -949,7 +972,7 @@ export const API = {
     return { success: true, materi: newMateri };
   },
   async deleteMateri(id: string): Promise<{ success: boolean }> {
-    const db = await await getDB();
+    const db = await getDB();
     db.materi = db.materi.filter(m => m.MateriID !== id);
     saveDB(db);
     await syncTableToGoogleSheets("materi");
@@ -958,11 +981,11 @@ export const API = {
 
   // Pengumuman
   async getPengumuman(): Promise<Pengumuman[]> {
-    const db = await await getDB();
+    const db = await getDB();
     return db.pengumuman || [];
   },
   async createPengumuman(data: Partial<Pengumuman>): Promise<{ success: boolean; pengumuman: Pengumuman }> {
-    const db = await await getDB();
+    const db = await getDB();
     const newId = "pen-" + generateUUID().substring(0, 8);
     const newPengumuman: Pengumuman = {
       PengumumanID: newId,
@@ -994,7 +1017,7 @@ export const API = {
     return { success: true, pengumuman: newPengumuman };
   },
   async deletePengumuman(id: string): Promise<{ success: boolean }> {
-    const db = await await getDB();
+    const db = await getDB();
     db.pengumuman = db.pengumuman.filter(p => p.PengumumanID !== id);
     saveDB(db);
     await syncTableToGoogleSheets("pengumuman");
@@ -1003,11 +1026,11 @@ export const API = {
 
   // Inventaris
   async getInventaris(): Promise<Inventaris[]> {
-    const db = await await getDB();
+    const db = await getDB();
     return db.inventaris || [];
   },
   async createInventaris(data: Partial<Inventaris>): Promise<{ success: boolean; inventaris: Inventaris }> {
-    const db = await await getDB();
+    const db = await getDB();
     const newId = "inv-" + generateUUID().substring(0, 8);
     const newInventaris: Inventaris = {
       InventarisID: newId,
@@ -1027,7 +1050,7 @@ export const API = {
     return { success: true, inventaris: newInventaris };
   },
   async updateInventaris(id: string, data: Partial<Inventaris>): Promise<{ success: boolean; inventaris: Inventaris }> {
-    const db = await await getDB();
+    const db = await getDB();
     const index = db.inventaris.findIndex(i => i.InventarisID === id);
     if (index === -1) throw new Error("Barang tidak ditemukan.");
     const updated = { ...db.inventaris[index], ...data };
@@ -1037,7 +1060,7 @@ export const API = {
     return { success: true, inventaris: updated };
   },
   async deleteInventaris(id: string): Promise<{ success: boolean }> {
-    const db = await await getDB();
+    const db = await getDB();
     db.inventaris = db.inventaris.filter(i => i.InventarisID !== id);
     saveDB(db);
     await syncTableToGoogleSheets("inventaris");
@@ -1046,11 +1069,11 @@ export const API = {
 
   // Refleksi
   async getRefleksiSiswa(): Promise<RefleksiSiswa[]> {
-    const db = await await getDB();
+    const db = await getDB();
     return db.refleksi_siswa || [];
   },
   async createRefleksiSiswa(data: Partial<RefleksiSiswa>): Promise<{ success: boolean; refleksi: RefleksiSiswa }> {
-    const db = await await getDB();
+    const db = await getDB();
     const newId = "rfs-" + generateUUID().substring(0, 8);
     const newRefleksi: RefleksiSiswa = {
       RefleksiID: newId,
@@ -1065,11 +1088,11 @@ export const API = {
     return { success: true, refleksi: newRefleksi };
   },
   async getRefleksiPembina(): Promise<RefleksiPembina[]> {
-    const db = await await getDB();
+    const db = await getDB();
     return db.refleksi_pembina || [];
   },
   async createRefleksiPembina(data: Partial<RefleksiPembina>): Promise<{ success: boolean; refleksi: RefleksiPembina }> {
-    const db = await await getDB();
+    const db = await getDB();
     const newId = "rfp-" + generateUUID().substring(0, 8);
     const newRefleksi: RefleksiPembina = {
       RefleksiID: newId,
@@ -1086,11 +1109,11 @@ export const API = {
 
   // Penilaian Sikap
   async getPenilaianSikap(): Promise<PenilaianSikap[]> {
-    const db = await await getDB();
+    const db = await getDB();
     return db.penilaian_sikap || [];
   },
   async createPenilaianSikap(data: Partial<PenilaianSikap>): Promise<{ success: boolean; penilaian: PenilaianSikap }> {
-    const db = await await getDB();
+    const db = await getDB();
     const newId = "pnk-" + generateUUID().substring(0, 8);
     
     const disiplin = data.Disiplin || 3;
@@ -1137,17 +1160,17 @@ export const API = {
 
   // Logs
   async getLogs(): Promise<LogAktivitas[]> {
-    const db = await await getDB();
+    const db = await getDB();
     return db.log_aktivitas || [];
   },
 
   // Notifikasi
   async getNotifikasi(): Promise<Notifikasi[]> {
-    const db = await await getDB();
+    const db = await getDB();
     return db.notifikasi || [];
   },
   async readNotifikasi(id: string): Promise<{ success: boolean }> {
-    const db = await await getDB();
+    const db = await getDB();
     db.notifikasi = db.notifikasi.map(n => {
       if (n.NotifikasiID === id) {
         return { ...n, Status: "Read" as const };
@@ -1161,11 +1184,11 @@ export const API = {
 
   // Prestasi
   async getPrestasi(): Promise<Prestasi[]> {
-    const db = await await getDB();
+    const db = await getDB();
     return db.prestasi || [];
   },
   async createPrestasi(data: Partial<Prestasi>): Promise<{ success: boolean; prestasi: Prestasi }> {
-    const db = await await getDB();
+    const db = await getDB();
     const newId = "prs-" + generateUUID().substring(0, 8);
     
     let sertifikatUrl = data.Sertifikat || "";
@@ -1196,7 +1219,7 @@ export const API = {
     return { success: true, prestasi: newPrestasi };
   },
   async updatePrestasi(id: string, data: Partial<Prestasi>): Promise<{ success: boolean; prestasi: Prestasi }> {
-    const db = await await getDB();
+    const db = await getDB();
     const index = db.prestasi.findIndex(p => p.PrestasiID === id);
     if (index === -1) throw new Error("Prestasi tidak ditemukan.");
 
@@ -1224,7 +1247,7 @@ export const API = {
     return { success: true, prestasi: updated };
   },
   async deletePrestasi(id: string): Promise<{ success: boolean }> {
-    const db = await await getDB();
+    const db = await getDB();
     db.prestasi = (db.prestasi || []).filter(p => p.PrestasiID !== id);
     saveDB(db);
     await syncTableToGoogleSheets("prestasi");
@@ -1234,7 +1257,7 @@ export const API = {
   // Backup / Restore
   async triggerRestore(backupData: any): Promise<{ success: boolean; message: string }> {
     if (backupData && backupData.config) {
-      const db = await await getDB();
+      const db = await getDB();
       const restored: Database = {
         configs: { ...db.configs, ...backupData.config },
         users: backupData.users || [],
