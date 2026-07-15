@@ -8,7 +8,7 @@ import {
   Plus, Edit, Trash2, Search, Filter, Printer, FileSpreadsheet, FileText, 
   Eye, X, Upload, Calendar, Award, CheckCircle, Smile, BookOpen, BarChart3, AlertCircle 
 } from "lucide-react";
-import { Peserta, UserRole, MasterSKU, ProgressSKU, TKKAward, AbsensiPeserta, RefleksiSiswa, PenilaianSikap } from "../types";
+import { Peserta, UserRole, MasterSKU, ProgressSKU, TKKAward, AbsensiPeserta, RefleksiSiswa, PenilaianSikap, User } from "../types";
 
 interface PesertaViewProps {
   pesertaList: Peserta[];
@@ -19,6 +19,7 @@ interface PesertaViewProps {
   absensiList: AbsensiPeserta[];
   refleksiList: RefleksiSiswa[];
   penilaianList: PenilaianSikap[];
+  currentUser?: User | null;
   onCreate: (data: Partial<Peserta>) => void;
   onUpdate: (id: string, data: Partial<Peserta>) => void;
   onDelete: (id: string) => void;
@@ -36,6 +37,7 @@ export default function PesertaView({
   absensiList,
   refleksiList,
   penilaianList,
+  currentUser,
   onCreate,
   onUpdate,
   onDelete,
@@ -697,7 +699,7 @@ export default function PesertaView({
                                       SkuID: s.SkuID,
                                       Status: "Lulus",
                                       Catatan: comment,
-                                      PembinaID: "pem-budi-1"
+                                      PembinaID: currentUser?.PembinaID || "pem-general"
                                     });
                                   }
                                 }}
@@ -765,7 +767,7 @@ export default function PesertaView({
                               Tingkatan: tkkValidation.Tingkatan,
                               Tanggal: new Date().toISOString().split("T")[0],
                               NomorSertifikat: tkkValidation.NomorSertifikat,
-                              PembinaID: "pem-budi-1",
+                              PembinaID: currentUser?.PembinaID || "pem-general",
                               Catatan: "Diberikan berdasarkan penilaian kecakapan lapangan."
                             });
                             setTkkValidation(prev => ({ ...prev, NomorSertifikat: "" }));

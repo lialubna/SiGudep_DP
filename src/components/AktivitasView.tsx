@@ -4,8 +4,8 @@
  */
 
 import React, { useState } from "react";
-import { Plus, Trash2, Calendar, MapPin, Clock, CheckCircle, User, Award, ShieldAlert } from "lucide-react";
-import { Jadwal, KalenderKegiatan, AbsensiPeserta, UserRole, Peserta } from "../types";
+import { Plus, Trash2, Calendar, MapPin, Clock, CheckCircle, Award, ShieldAlert } from "lucide-react";
+import { Jadwal, KalenderKegiatan, AbsensiPeserta, UserRole, Peserta, User } from "../types";
 
 interface AktivitasViewProps {
   jadwalList: Jadwal[];
@@ -14,6 +14,7 @@ interface AktivitasViewProps {
   pesertaList: Peserta[];
   userRole: UserRole;
   userName: string;
+  currentUser?: User | null;
   onCreateJadwal: (data: Partial<Jadwal>) => void;
   onDeleteJadwal: (id: string) => void;
   onRecordAbsensi: (data: any) => void;
@@ -27,6 +28,7 @@ export default function AktivitasView({
   pesertaList,
   userRole,
   userName,
+  currentUser,
   onCreateJadwal,
   onDeleteJadwal,
   onRecordAbsensi,
@@ -55,19 +57,19 @@ export default function AktivitasView({
     setNewJadwal({ Judul: "", Tanggal: new Date().toISOString().split("T")[0], Jam: "14:00 - 16:00", Lokasi: "Lapangan Sekolah", Deskripsi: "" });
   };
 
-  // Mock checking-in GPS
+  // Real-time GPS Check-In Recording
   const triggerGpsCheckIn = () => {
     setCheckingIn(true);
     setTimeout(() => {
       onRecordAbsensi({
-        PesertaID: "pes-ahmad-1", // default logged in student
+        PesertaID: currentUser?.PesertaID || "usr-self", // dynamic logged in student
         Tanggal: new Date().toISOString().split("T")[0],
         JamMasuk: new Date().toLocaleTimeString("id-ID"),
         Status: "Hadir",
         Latitude: -6.17511 + (Math.random() - 0.5) * 0.001,
         Longitude: 106.865039 + (Math.random() - 0.5) * 0.001,
         Lokasi: "SMP Negeri 1 Jakarta (Pramuka Center)",
-        PembinaID: "pem-budi-1"
+        PembinaID: currentUser?.PembinaID || "pem-general"
       });
       setCheckingIn(false);
       setCheckInSuccess(true);

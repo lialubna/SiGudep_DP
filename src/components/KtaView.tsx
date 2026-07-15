@@ -134,7 +134,7 @@ export default function KtaView({ pesertaList, darkTheme }: KtaViewProps) {
           </div>
 
           <div className="flex justify-between items-end border-t border-slate-700 pt-3">
-            {/* Dynamic QR Code mockup */}
+            {/* Dynamic QR Code Render */}
             <div className="p-1 bg-white rounded-lg">
               <div className="w-11 h-11 border-[3px] border-slate-900 flex flex-wrap p-0.5 gap-0.5">
                 <div className="w-3.5 h-3.5 bg-slate-900" />

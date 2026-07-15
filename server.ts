@@ -330,7 +330,7 @@ function initDefaultDB(): Database {
 
   const initialLog: LogAktivitas[] = [
     {
-      LogID: "log-seed-1",
+      LogID: "log-init-1",
       Tanggal: new Date().toISOString().split('T')[0],
       Jam: new Date().toLocaleTimeString('id-ID'),
       UserID: "SYSTEM",

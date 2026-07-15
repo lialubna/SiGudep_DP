@@ -5,11 +5,12 @@
 
 import React, { useState } from "react";
 import { Plus, Trash2, Search, BookOpen, Link, Video, FileText, X } from "lucide-react";
-import { Materi, UserRole } from "../types";
+import { Materi, UserRole, User } from "../types";
 
 interface MateriViewProps {
   materiList: Materi[];
   userRole: UserRole;
+  currentUser?: User | null;
   onCreateMateri: (data: Partial<Materi>) => void;
   onDeleteMateri: (id: string) => void;
   darkTheme: boolean;
@@ -18,6 +19,7 @@ interface MateriViewProps {
 export default function MateriView({
   materiList,
   userRole,
+  currentUser,
   onCreateMateri,
   onDeleteMateri,
   darkTheme
@@ -39,7 +41,7 @@ export default function MateriView({
     onCreateMateri({
       ...formData,
       Tanggal: new Date().toISOString().split("T")[0],
-      PembinaID: "pem-budi-1"
+      PembinaID: currentUser?.PembinaID || "pem-general"
     });
     setShowAddForm(false);
     setFormData({ Judul: "", Kategori: "Teknik Kepramukaan", JenisFile: "Google Slides", Link: "", Deskripsi: "" });

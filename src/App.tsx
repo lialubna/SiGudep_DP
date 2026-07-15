@@ -627,6 +627,7 @@ export default function App() {
               absensiList={absensiList}
               refleksiList={refleksiList}
               penilaianList={penilaianList}
+              currentUser={currentUser}
               onCreate={handleCreatePeserta}
               onUpdate={handleUpdatePeserta}
               onDelete={handleDeletePeserta}
@@ -677,6 +678,7 @@ export default function App() {
               pesertaList={pesertaList}
               userRole={userRole}
               userName={userName}
+              currentUser={currentUser}
               onCreateJadwal={handleCreateJadwal}
               onDeleteJadwal={handleDeleteJadwal}
               onRecordAbsensi={handleRecordAbsensi}
@@ -688,6 +690,7 @@ export default function App() {
             <MateriView
               materiList={materiList}
               userRole={userRole}
+              currentUser={currentUser}
               onCreateMateri={handleCreateMateri}
               onDeleteMateri={handleDeleteMateri}
               darkTheme={darkTheme}
@@ -701,6 +704,7 @@ export default function App() {
               pesertaList={pesertaList}
               userRole={userRole}
               userName={userName}
+              currentUser={currentUser}
               onSubmitRefleksi={handleCreateRefleksi}
               onSubmitPenilaian={handleCreatePenilaian}
               darkTheme={darkTheme}

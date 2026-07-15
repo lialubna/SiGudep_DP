@@ -5,7 +5,7 @@
 
 import React, { useState } from "react";
 import { Plus, BookOpen, Smile, FileText, CheckCircle, Award, Star, BarChart } from "lucide-react";
-import { RefleksiSiswa, PenilaianSikap, Peserta, UserRole } from "../types";
+import { RefleksiSiswa, PenilaianSikap, Peserta, UserRole, User } from "../types";
 
 interface EvaluasiViewProps {
   refleksiList: RefleksiSiswa[];
@@ -13,6 +13,7 @@ interface EvaluasiViewProps {
   pesertaList: Peserta[];
   userRole: UserRole;
   userName: string;
+  currentUser?: User | null;
   onSubmitRefleksi: (data: Partial<RefleksiSiswa>) => void;
   onSubmitPenilaian: (data: Partial<PenilaianSikap>) => void;
   darkTheme: boolean;
@@ -24,6 +25,7 @@ export default function EvaluasiView({
   pesertaList,
   userRole,
   userName,
+  currentUser,
   onSubmitRefleksi,
   onSubmitPenilaian,
   darkTheme
@@ -48,7 +50,7 @@ export default function EvaluasiView({
     e.preventDefault();
     if (!refleksiText) return;
     onSubmitRefleksi({
-      PesertaID: "pes-ahmad-1", // default logged in scout
+      PesertaID: currentUser?.PesertaID || "usr-self", // dynamic logged in scout
       Tanggal: new Date().toISOString().split("T")[0],
       Isi: refleksiText
     });
@@ -66,7 +68,7 @@ export default function EvaluasiView({
     }
     onSubmitPenilaian({
       PesertaID: selectedPesertaId,
-      PembinaID: "pem-budi-1",
+      PembinaID: currentUser?.PembinaID || "pem-general",
       Periode: periode,
       Tanggal: new Date().toISOString().split("T")[0],
       ...ratings,
