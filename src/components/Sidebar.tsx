@@ -18,6 +18,7 @@ interface SidebarProps {
   userName: string;
   gudepName: string;
   gudepNumber: string;
+  gudepLogo?: string;
   onLogout: () => void;
   isOpen: boolean;
   setIsOpen: (val: boolean) => void;
@@ -32,6 +33,7 @@ export default function Sidebar({
   userName,
   gudepName,
   gudepNumber,
+  gudepLogo,
   onLogout,
   isOpen,
   setIsOpen,
@@ -77,11 +79,20 @@ export default function Sidebar({
       >
         {/* Brand Header */}
         <div className="p-5 border-b border-white/10 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center text-stone-950 font-bold text-xl shadow-lg shadow-amber-500/20 border border-stone-950">
-            ⛺
+          <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center text-stone-950 font-bold text-xl shadow-lg shadow-amber-500/20 border border-stone-950 overflow-hidden bg-white">
+            {gudepLogo ? (
+              <img 
+                src={gudepLogo} 
+                alt="Logo Gudep" 
+                className="w-full h-full object-contain p-1" 
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              "⛺"
+            )}
           </div>
           <div className="min-w-0">
-            <h1 className="font-bold tracking-tight text-lg text-white leading-tight">SiGudep</h1>
+            <h1 className="font-bold tracking-tight text-lg text-white leading-tight truncate">{gudepName || "SiGudep"}</h1>
             <p className="text-[10px] uppercase tracking-widest text-amber-400 font-bold">Gudep {gudepNumber || "03.045"}</p>
           </div>
         </div>

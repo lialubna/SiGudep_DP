@@ -575,14 +575,30 @@ export default function App() {
           ${darkTheme ? "bg-stone-900/40 border-stone-850" : "bg-white border-stone-200"}`}
         >
           {/* Logo badge */}
-          <div className="flex flex-col items-center text-center space-y-2">
-            <div className="w-16 h-16 rounded-2xl bg-teal-600 text-white flex items-center justify-center text-3xl shadow-lg shadow-teal-600/20 border-2 border-stone-900 dark:border-stone-100">
-              ⛺
+          <div className="flex flex-col items-center text-center space-y-3">
+            <div className="w-20 h-20 rounded-2xl bg-white flex items-center justify-center text-4xl shadow-xl border-2 border-stone-200 dark:border-stone-800 overflow-hidden p-1.5">
+              {appConfig.Logo ? (
+                <img 
+                  src={appConfig.Logo} 
+                  alt="Logo Gudep" 
+                  className="w-full h-full object-contain" 
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                "⛺"
+              )}
             </div>
-            <h1 className="text-2xl font-black tracking-tight mt-1">SiGudep Produksi</h1>
-            <p className="text-xs text-stone-500 dark:text-stone-400 max-w-xs leading-normal">
-              Sistem Informasi Gugus Depan Pramuka Mandiri. Sinkronisasi Native Google Spreadsheet.
-            </p>
+            <div>
+              <h1 className="text-2xl font-black tracking-tight text-stone-900 dark:text-white">
+                {appConfig.NamaAplikasi || "SiGudep"}
+              </h1>
+              <p className="text-xs font-bold text-amber-600 dark:text-amber-400 mt-1 uppercase tracking-wider">
+                Gugus Depan {appConfig.NomorGudep || (appConfig.NomorPutra && appConfig.NomorPutri ? `${appConfig.NomorPutra} - ${appConfig.NomorPutri}` : appConfig.NomorPutra || "05.123 - 05.124")}
+              </p>
+              <p className="text-xs text-stone-500 dark:text-stone-400 max-w-xs leading-normal mt-1.5 font-semibold">
+                Pangkalan: {appConfig.NamaGudep || "SMP Negeri 1 Jakarta"}
+              </p>
+            </div>
           </div>
 
           {bootstrapStatus.success && (
@@ -777,8 +793,9 @@ export default function App() {
         setTab={setTab}
         userRole={userRole}
         userName={userName}
-        gudepName={appConfig.NamaGudep}
-        gudepNumber={userRole === "PESERTA_DIDIK" ? appConfig.NomorPutra : appConfig.NomorPutra}
+        gudepName={appConfig.NamaAplikasi || "SiGudep"}
+        gudepNumber={appConfig.NomorGudep || (appConfig.NomorPutra && appConfig.NomorPutri ? `${appConfig.NomorPutra} - ${appConfig.NomorPutri}` : appConfig.NomorPutra || "03.045")}
+        gudepLogo={appConfig.Logo}
         onLogout={handleLogout}
         isOpen={sidebarOpen}
         setIsOpen={setSidebarOpen}
