@@ -41,6 +41,13 @@ export default function App() {
   const [authError, setAuthError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
 
+  // Connection and Bootstrapping States
+  const [showConfigScreen, setShowConfigScreen] = useState(false);
+  const [scriptUrlInput, setScriptUrlInput] = useState("");
+  const [bootstrapUsername, setBootstrapUsername] = useState("admin");
+  const [bootstrapPassword, setBootstrapPassword] = useState("");
+  const [bootstrapStatus, setBootstrapStatus] = useState({ success: "", error: "", loading: false });
+
   // Active User session info
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
@@ -49,7 +56,10 @@ export default function App() {
     GugusDepanID: "gudep-1", NamaGudep: "SMP Negeri 1 Jakarta",
     NomorPutra: "05.123", NomorPutri: "05.124",
     NamaMabigus: "Dr. H. Siswanto, M.Pd.", Kwarcab: "Jakarta Pusat", Kwarda: "DKI Jakarta",
-    AlamatSekretariat: "Jl. Lapangan Banteng Barat No.36, Jakarta", TahunAktif: "2026/2027", Logo: ""
+    AlamatSekretariat: "Jl. Lapangan Banteng Barat No.36, Jakarta", TahunAktif: "2026/2027", Logo: "",
+    NomorGudep: "05.123 - 05.124", AlamatGudep: "Jl. Lapangan Banteng Barat No.36, Jakarta",
+    Favicon: "", ThemeColor: "#2A9D8F", SpreadsheetID: "", FolderDriveID: "", ScriptURL: "",
+    Versi: "1.0", Email: "", Telepon: "", Website: "", CreatedAt: "", UpdatedAt: ""
   });
   const [usersList, setUsersList] = useState<User[]>([]);
   const [pembinaList, setPembinaList] = useState<Pembina[]>([]);
@@ -70,6 +80,19 @@ export default function App() {
 
   // Local storage session recoveries
   useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const cfg = await API.getConfig();
+        if (cfg) {
+          setAppConfig(cfg);
+          setScriptUrlInput(cfg.ScriptURL || "");
+        }
+      } catch (err) {
+        console.error("Gagal memuat konfigurasi awal:", err);
+      }
+    };
+    loadConfig();
+
     const savedUser = localStorage.getItem("sigudep_user");
     if (savedUser) {
       try {
@@ -176,6 +199,68 @@ export default function App() {
       setAuthError(err.message || "Gagal menghubungi server.");
     } finally {
       setLoggingIn(false);
+    }
+  };
+
+  // Handle Google Sheets integration & bootstrap admin account
+  const handleBootstrapSpreadsheet = async (e: React.FormEvent, initializeNew: boolean) => {
+    e.preventDefault();
+    if (!scriptUrlInput || !scriptUrlInput.startsWith("https://script.google.com")) {
+      setBootstrapStatus({ success: "", error: "Harap masukkan URL Apps Script Web App yang valid!", loading: false });
+      return;
+    }
+
+    setBootstrapStatus({ success: "", error: "", loading: true });
+    try {
+      // 1. Update system config with the URL
+      await API.updateConfig({ ScriptURL: scriptUrlInput });
+
+      if (initializeNew) {
+        if (!bootstrapUsername || !bootstrapPassword) {
+          throw new Error("Harap isi username dan password untuk akun admin baru.");
+        }
+        // 2. Initialize the Google Sheet sheets
+        await API.initializeGoogleSheets();
+
+        // 3. Create initial administrator user
+        await API.createUser({
+          Username: bootstrapUsername,
+          PasswordHash: bootstrapPassword,
+          Role: "SUPER_ADMIN",
+          NamaLengkap: "Administrator Utama",
+          Status: "Aktif"
+        });
+
+        setBootstrapStatus({
+          success: "Berhasil diinisialisasi! Google Spreadsheet telah terhubung dan akun administrator '" + bootstrapUsername + "' berhasil dibuat. Silakan login sekarang.",
+          error: "",
+          loading: false
+        });
+        setShowConfigScreen(false);
+      } else {
+        // Just pull/sync existing data
+        const syncRes = await API.syncGoogleSheets();
+        if (syncRes.success) {
+          setBootstrapStatus({
+            success: "Sinkronisasi Berhasil! Seluruh data dari Google Spreadsheet berhasil ditarik secara langsung.",
+            error: "",
+            loading: false
+          });
+          setShowConfigScreen(false);
+        } else {
+          throw new Error(syncRes.message || "Gagal sinkronisasi data.");
+        }
+      }
+      
+      // Update local configuration state
+      const updatedConfig = await API.getConfig();
+      setAppConfig(updatedConfig);
+    } catch (err: any) {
+      setBootstrapStatus({
+        success: "",
+        error: err.message || "Kesalahan koneksi atau inisialisasi.",
+        loading: false
+      });
     }
   };
 
@@ -491,14 +576,26 @@ export default function App() {
         >
           {/* Logo badge */}
           <div className="flex flex-col items-center text-center space-y-2">
-            <div className="w-16 h-16 rounded-2xl bg-amber-600 text-white flex items-center justify-center text-3xl shadow-lg shadow-amber-600/20 border-2 border-stone-900 dark:border-stone-100">
+            <div className="w-16 h-16 rounded-2xl bg-teal-600 text-white flex items-center justify-center text-3xl shadow-lg shadow-teal-600/20 border-2 border-stone-900 dark:border-stone-100">
               ⛺
             </div>
-            <h1 className="text-2xl font-black tracking-tight mt-1">SiGudep Login</h1>
+            <h1 className="text-2xl font-black tracking-tight mt-1">SiGudep Produksi</h1>
             <p className="text-xs text-stone-500 dark:text-stone-400 max-w-xs leading-normal">
-              Sistem Informasi Gugus Depan Pramuka SMP Negeri 1 Jakarta. Masukkan akun Pembina atau Siswa.
+              Sistem Informasi Gugus Depan Pramuka Mandiri. Sinkronisasi Native Google Spreadsheet.
             </p>
           </div>
+
+          {bootstrapStatus.success && (
+            <div className="p-3.5 text-xs rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-center font-medium">
+              {bootstrapStatus.success}
+            </div>
+          )}
+
+          {bootstrapStatus.error && (
+            <div className="p-3.5 text-xs rounded-xl bg-red-500/10 text-red-500 border border-red-500/20 text-center font-medium">
+              {bootstrapStatus.error}
+            </div>
+          )}
 
           {authError && (
             <div className="p-3 text-xs font-semibold rounded-xl bg-red-500/10 text-red-500 border border-red-500/20 text-center animate-pulse">
@@ -506,59 +603,164 @@ export default function App() {
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-4 text-xs">
-            <div className="space-y-1">
-              <label className="font-bold text-stone-500 dark:text-stone-400 uppercase text-[9px] tracking-wider">Nama Akun (Username)</label>
-              <input
-                type="text"
-                placeholder="Masukkan username (contoh: admin / budi)"
-                value={loginUsername}
-                onChange={(e) => setLoginUsername(e.target.value)}
-                className={`w-full px-4 py-3 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all
-                  ${darkTheme ? "bg-stone-800 border-stone-700 text-white" : "bg-stone-50 border-stone-200 text-stone-800"}`}
-                required
-              />
-            </div>
+          {/* Configuration Form toggled or shown if no ScriptURL is present */}
+          {(showConfigScreen || !appConfig.ScriptURL) ? (
+            <div className="space-y-4">
+              <div className="border-b border-stone-300/10 pb-2">
+                <h2 className="text-sm font-bold text-teal-500 flex items-center gap-1.5">
+                  <span>⚙️ Pengaturan Database Spreadsheet</span>
+                </h2>
+                <p className="text-[10px] text-stone-400 mt-0.5">
+                  Masukkan Web App URL Google Apps Script dari deploy Web App Anda (Anyone).
+                </p>
+              </div>
 
-            <div className="space-y-1">
-              <label className="font-bold text-stone-500 dark:text-stone-400 uppercase text-[9px] tracking-wider">Kata Sandi (Password)</label>
-              <input
-                type="password"
-                placeholder="Masukkan kata sandi akun"
-                value={loginPassword}
-                onChange={(e) => setLoginPassword(e.target.value)}
-                className={`w-full px-4 py-3 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all
-                  ${darkTheme ? "bg-stone-800 border-stone-700 text-white" : "bg-stone-50 border-stone-200 text-stone-800"}`}
-                required
-              />
-            </div>
+              <form onSubmit={(e) => handleBootstrapSpreadsheet(e, false)} className="space-y-4 text-xs">
+                <div className="space-y-1">
+                  <label className="font-bold text-stone-500 dark:text-stone-400 uppercase text-[9px] tracking-wider">Apps Script Web App URL</label>
+                  <input
+                    type="url"
+                    placeholder="https://script.google.com/macros/s/.../exec"
+                    value={scriptUrlInput}
+                    onChange={(e) => setScriptUrlInput(e.target.value)}
+                    className={`w-full px-4 py-3 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all
+                      ${darkTheme ? "bg-stone-800 border-stone-700 text-white" : "bg-stone-50 border-stone-200 text-stone-800"}`}
+                    required
+                  />
+                </div>
 
-            <button
-              type="submit"
-              disabled={loggingIn}
-              className="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl transition-all shadow-lg shadow-amber-500/15 flex items-center justify-center gap-1.5 border border-amber-700"
-            >
-              {loggingIn ? (
-                <>
-                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Memvalidasi Akun...</span>
-                </>
-              ) : (
-                <>
-                  <LogIn className="w-4 h-4" />
-                  <span>Masuk Sesi</span>
-                </>
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    disabled={bootstrapStatus.loading}
+                    className="flex-1 py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl transition-all shadow-lg shadow-teal-500/15 flex items-center justify-center gap-1.5 border border-teal-700"
+                  >
+                    {bootstrapStatus.loading ? (
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <span>Sinkronkan & Tarik Data</span>
+                    )}
+                  </button>
+                </div>
+              </form>
+
+              <div className="border-t border-stone-300/10 pt-4 mt-2 space-y-3">
+                <div>
+                  <span className="text-[10px] font-bold text-stone-400 block uppercase tracking-wider">Atau Inisialisasi Database Baru dari Nol:</span>
+                  <p className="text-[9px] text-stone-500 mt-0.5 leading-normal">
+                    Jika spreadsheet Anda masih kosong, kami akan membuatkan seluruh lembar sheet (20 sheet) otomatis dan membuat akun admin pertama Anda di bawah ini:
+                  </p>
+                </div>
+
+                <form onSubmit={(e) => handleBootstrapSpreadsheet(e, true)} className="space-y-3 text-xs">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <label className="font-bold text-stone-500 dark:text-stone-400 uppercase text-[8px] tracking-wider">Username Admin</label>
+                      <input
+                        type="text"
+                        value={bootstrapUsername}
+                        onChange={(e) => setBootstrapUsername(e.target.value)}
+                        placeholder="admin"
+                        className={`w-full px-3 py-2 text-xs rounded-lg border focus:outline-none focus:ring-2 focus:ring-teal-500
+                          ${darkTheme ? "bg-stone-800 border-stone-700 text-white" : "bg-stone-50 border-stone-200 text-stone-800"}`}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="font-bold text-stone-500 dark:text-stone-400 uppercase text-[8px] tracking-wider">Password Admin</label>
+                      <input
+                        type="password"
+                        value={bootstrapPassword}
+                        onChange={(e) => setBootstrapPassword(e.target.value)}
+                        placeholder="Buat sandi aman"
+                        className={`w-full px-3 py-2 text-xs rounded-lg border focus:outline-none focus:ring-2 focus:ring-teal-500
+                          ${darkTheme ? "bg-stone-800 border-stone-700 text-white" : "bg-stone-50 border-stone-200 text-stone-800"}`}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={bootstrapStatus.loading}
+                    className="w-full py-2.5 bg-stone-700 hover:bg-stone-600 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5"
+                  >
+                    {bootstrapStatus.loading ? (
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <span>Buat Sheet & Akun Admin</span>
+                    )}
+                  </button>
+                </form>
+              </div>
+
+              {appConfig.ScriptURL && (
+                <button
+                  onClick={() => setShowConfigScreen(false)}
+                  className="w-full py-2 text-stone-400 hover:text-stone-200 text-xs font-semibold border border-stone-300/10 rounded-xl"
+                >
+                  Kembali ke Layar Login
+                </button>
               )}
-            </button>
-          </form>
+            </div>
+          ) : (
+            <>
+              <form onSubmit={handleLogin} className="space-y-4 text-xs">
+                <div className="space-y-1">
+                  <label className="font-bold text-stone-500 dark:text-stone-400 uppercase text-[9px] tracking-wider">Nama Akun (Username)</label>
+                  <input
+                    type="text"
+                    placeholder="Masukkan username akun Anda"
+                    value={loginUsername}
+                    onChange={(e) => setLoginUsername(e.target.value)}
+                    className={`w-full px-4 py-3 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all
+                      ${darkTheme ? "bg-stone-800 border-stone-700 text-white" : "bg-stone-50 border-stone-200 text-stone-800"}`}
+                    required
+                  />
+                </div>
 
-          {/* Quick instructions widget */}
-          <div className="p-3.5 rounded-2xl bg-stone-500/5 border border-stone-300/5 text-[10px] text-stone-500 dark:text-stone-400 space-y-1 font-mono">
-            <span className="font-bold block text-amber-600">Panduan Akun Standar:</span>
-            <p>• Admin: <code>admin</code> / <code>admin123</code></p>
-            <p>• Pembina: <code>budi</code> / <code>budi123</code></p>
-            <p>• Siswa: <code>ahmad</code> / <code>ahmad123</code></p>
-          </div>
+                <div className="space-y-1">
+                  <label className="font-bold text-stone-500 dark:text-stone-400 uppercase text-[9px] tracking-wider">Kata Sandi (Password)</label>
+                  <input
+                    type="password"
+                    placeholder="Masukkan kata sandi akun Anda"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    className={`w-full px-4 py-3 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all
+                      ${darkTheme ? "bg-stone-800 border-stone-700 text-white" : "bg-stone-50 border-stone-200 text-stone-800"}`}
+                    required
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loggingIn}
+                  className="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl transition-all shadow-lg shadow-amber-500/15 flex items-center justify-center gap-1.5 border border-amber-700"
+                >
+                  {loggingIn ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Memvalidasi Akun...</span>
+                    </>
+                  ) : (
+                    <>
+                      <LogIn className="w-4 h-4" />
+                      <span>Masuk Sesi</span>
+                    </>
+                  )}
+                </button>
+              </form>
+
+              <div className="pt-2 text-center">
+                <button
+                  onClick={() => setShowConfigScreen(true)}
+                  className="text-stone-400 hover:text-stone-200 text-xs font-semibold underline decoration-dotted transition-colors"
+                >
+                  Ubah Pengaturan Koneksi Spreadsheet
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </main>
     );
