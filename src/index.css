@@ -1,0 +1,275 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --color-brand-primary: #78350f; /* Amber-900 */
+  --color-brand-accent: #d97706; /* Amber-600 */
+}
+
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    background-color: #f5f5f4; /* Stone-100 */
+    color: #1c1917; /* Stone-900 */
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-sans);
+    letter-spacing: -0.025em;
+  }
+}
+
+/* Bento custom styling utility classes */
+.bento-card {
+  background-color: #ffffff;
+  border: 1px solid #e7e5e4; /* Stone-200 */
+  border-radius: 1rem; /* 16px */
+  padding: 1.25rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease-in-out;
+}
+
+.dark .bento-card {
+  background-color: #1c1917; /* Stone-900 */
+  border-color: #292524; /* Stone-800 */
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.bento-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.dark .bento-card:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+}
+
+/* Bold retro bento style */
+.bento-card-bold {
+  background-color: #ffffff;
+  border: 2px solid #1c1917; /* Stone-900 */
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 4px 4px 0px 0px #1c1917;
+  transition: all 0.15s ease-in-out;
+}
+
+.dark .bento-card-bold {
+  background-color: #1c1917; /* Stone-900 */
+  border-color: #fafaf9; /* Stone-50 */
+  box-shadow: 4px 4px 0px 0px #d97706; /* Amber-600 */
+}
+
+.bento-card-bold:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 6px 6px 0px 0px #1c1917;
+}
+
+.dark .bento-card-bold:hover {
+  box-shadow: 6px 6px 0px 0px #d97706;
+}
+
+/* Bento custom buttons */
+.bento-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 0.75rem; /* text-xs */
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.75rem; /* 12px */
+  border: 2px solid #1c1917;
+  background-color: #d97706; /* Amber-600 */
+  color: #ffffff;
+  box-shadow: 2px 2px 0px 0px #1c1917;
+  transition: all 0.1s ease-in-out;
+}
+
+.dark .bento-btn {
+  border-color: #fafaf9;
+  box-shadow: 2px 2px 0px 0px #fafaf9;
+}
+
+.bento-btn:hover {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0px 0px #1c1917;
+}
+
+.dark .bento-btn:hover {
+  box-shadow: 1px 1px 0px 0px #fafaf9;
+}
+
+.bento-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.75rem;
+  padding: 0.625rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid #e7e5e4;
+  background-color: #f5f5f4;
+  color: #44403c;
+  transition: all 0.2s ease;
+}
+
+.dark .bento-btn-secondary {
+  border-color: #292524;
+  background-color: #292524;
+  color: #fafaf9;
+}
+
+.bento-btn-secondary:hover {
+  background-color: #e7e5e4;
+  color: #1c1917;
+}
+
+.dark .bento-btn-secondary:hover {
+  background-color: #3f3f46;
+  color: #ffffff;
+}
+
+/* Tags */
+.bento-tag {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  background-color: #fef3c7; /* Amber-100 */
+  color: #78350f; /* Amber-900 */
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 0.375rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.dark .bento-tag {
+  background-color: rgba(217, 119, 6, 0.15);
+  color: #fbbf24; /* Amber-400 */
+}
+
+/* Custom theme variables and scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #d97706; /* Amber-600 */
+}
+
+/* Custom styles for KTA and Printing */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-out forwards;
+}
+
+/* Soft scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Bento Grid global color/class mapping overrides */
+
+/* Make all text-teal classes map to beautiful amber */
+.text-teal-500, .text-teal-600 {
+  color: #d97706 !important; /* Amber-600 */
+}
+.text-teal-400 {
+  color: #f59e0b !important; /* Amber-500 */
+}
+.text-teal-700 {
+  color: #b45309 !important; /* Amber-700 */
+}
+
+/* Map all bg-teal classes to beautiful amber */
+.bg-teal-500, .bg-teal-600 {
+  background-color: #d97706 !important; /* Amber-600 */
+}
+.bg-teal-500\/10 {
+  background-color: rgba(217, 119, 6, 0.1) !important;
+}
+.bg-teal-950\/20 {
+  background-color: rgba(217, 119, 6, 0.15) !important;
+}
+.hover\:bg-teal-600:hover, .hover\:bg-teal-500:hover {
+  background-color: #b45309 !important; /* Amber-700 */
+}
+.border-teal-500 {
+  border-color: #d97706 !important;
+}
+.border-teal-500\/20 {
+  border-color: rgba(217, 119, 6, 0.2) !important;
+}
+.focus\:ring-teal-500:focus {
+  --tw-ring-color: #d97706 !important;
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), 0 0 0 2px #d97706 !important;
+}
+
+/* Override backgrounds globally to warm stone style */
+body {
+  background-color: #f5f5f4 !important; /* Stone-100 */
+}
+.dark body {
+  background-color: #0c0a09 !important; /* Stone-950 */
+}
+
+/* Slate utility remapping for perfect dark mode tone consistency */
+.dark .bg-slate-900 {
+  background-color: #1c1917 !important; /* Stone-900 */
+}
+.dark .bg-slate-800, .dark .bg-slate-800\/40, .dark .bg-slate-800\/60 {
+  background-color: #1c1917 !important; /* Stone-900 */
+}
+.dark .bg-slate-950 {
+  background-color: #0c0a09 !important; /* Stone-950 */
+}
+.dark .border-slate-700, .dark .border-slate-800, .dark .border-slate-700\/50 {
+  border-color: #292524 !important; /* Stone-800 */
+}
+.dark .text-slate-300 {
+  color: #d6d3d1 !important; /* Stone-300 */
+}
+.dark .text-slate-400 {
+  color: #a8a29e !important; /* Stone-400 */
+}
+.dark .text-slate-100 {
+  color: #fafaf9 !important; /* Stone-50 */
+}
+.dark .text-slate-200 {
+  color: #e7e5e4 !important; /* Stone-200 */
+}
+
+/* Custom rounded card enhancements */
+.rounded-2xl {
+  border-radius: 1rem !important;
+}
+.rounded-3xl {
+  border-radius: 1.25rem !important;
+}

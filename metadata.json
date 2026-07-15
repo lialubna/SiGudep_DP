@@ -1,0 +1,6 @@
+{
+  "name": "SiGudep",
+  "description": "Sistem Informasi Gugus Depan Pramuka untuk pencatatan SKU, TKK, absensi, inventaris, penilaian sikap, dan cetak KTA Digital.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
