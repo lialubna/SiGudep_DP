@@ -48,6 +48,7 @@ export default function Sidebar({
     { id: "pembina", label: "Data Pembina", icon: UserCheck, roles: ["SUPER_ADMIN", "ADMIN"] },
     { id: "sensus", label: "Master User & Log", icon: ShieldAlert, roles: ["SUPER_ADMIN", "ADMIN"] },
     { id: "sku_tkk", label: "SKU & TKK", icon: Award, roles: ["SUPER_ADMIN", "ADMIN", "PEMBINA", "PESERTA_DIDIK"] },
+    { id: "prestasi", label: "Prestasi Gudep", icon: Sparkles, roles: ["SUPER_ADMIN", "ADMIN", "PEMBINA", "PESERTA_DIDIK"] },
     { id: "aktivitas", label: "Jadwal & Absensi", icon: Calendar, roles: ["SUPER_ADMIN", "ADMIN", "PEMBINA", "PESERTA_DIDIK"] },
     { id: "materi", label: "Materi Latihan", icon: BookOpen, roles: ["SUPER_ADMIN", "ADMIN", "PEMBINA", "PESERTA_DIDIK"] },
     { id: "evaluasi", label: "Refleksi & Karakter", icon: Smile, roles: ["SUPER_ADMIN", "ADMIN", "PEMBINA", "PESERTA_DIDIK"] },

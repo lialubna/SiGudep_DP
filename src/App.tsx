@@ -9,7 +9,7 @@ import {
   AppConfig, User, Pembina, Peserta, MasterSKU, ProgressSKU, 
   TKKAward, AbsensiPeserta, Jadwal, KalenderKegiatan, 
   Materi, Pengumuman, Notifikasi, Inventaris, RefleksiSiswa, 
-  PenilaianSikap, LogAktivitas, UserRole 
+  PenilaianSikap, LogAktivitas, UserRole, Prestasi 
 } from "./types";
 
 // Import UI components
@@ -26,6 +26,7 @@ import LogistikView from "./components/LogistikView";
 import EvaluasiView from "./components/EvaluasiView";
 import KtaView from "./components/KtaView";
 import SistemView from "./components/SistemView";
+import PrestasiView from "./components/PrestasiView";
 
 import { ShieldCheck, LogIn, Award, Activity, Key } from "lucide-react";
 
@@ -77,6 +78,7 @@ export default function App() {
   const [penilaianList, setPenilaianList] = useState<PenilaianSikap[]>([]);
   const [logsList, setLogsList] = useState<LogAktivitas[]>([]);
   const [notifications, setNotifications] = useState<Notifikasi[]>([]);
+  const [prestasiList, setPrestasiList] = useState<Prestasi[]>([]);
 
   // Local storage session recoveries
   useEffect(() => {
@@ -128,7 +130,7 @@ export default function App() {
       const [
         cfg, users, pembinas, pesertas, sku, progress, tkk, 
         absensi, jadwals, kalender, materis, pengumuman, 
-        inventaris, refleksi, penilaian, logs, notifs
+        inventaris, refleksi, penilaian, logs, notifs, prestasis
       ] = await Promise.all([
         API.getConfig(),
         API.getUsers(),
@@ -146,7 +148,8 @@ export default function App() {
         API.getRefleksiSiswa(),
         API.getPenilaianSikap(),
         API.getLogs(),
-        API.getNotifikasi()
+        API.getNotifikasi(),
+        API.getPrestasi()
       ]);
 
       if (cfg) setAppConfig(cfg);
@@ -166,6 +169,7 @@ export default function App() {
       setPenilaianList(penilaian || []);
       setLogsList(logs || []);
       setNotifications(notifs || []);
+      setPrestasiList(prestasis || []);
     } catch (err) {
       console.error("Gagal memuat data dari server:", err);
     }
@@ -449,6 +453,34 @@ export default function App() {
       fetchAllData();
     } catch (err: any) {
       alert(err.message);
+    }
+  };
+
+  // Prestasi
+  const handleCreatePrestasi = async (data: Partial<Prestasi>) => {
+    try {
+      await API.createPrestasi(data);
+      fetchAllData();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+  const handleUpdatePrestasi = async (id: string, data: Partial<Prestasi>) => {
+    try {
+      await API.updatePrestasi(id, data);
+      fetchAllData();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+  const handleDeletePrestasi = async (id: string) => {
+    if (confirm("Apakah Anda yakin ingin menghapus data prestasi ini?")) {
+      try {
+        await API.deletePrestasi(id);
+        fetchAllData();
+      } catch (err: any) {
+        alert(err.message);
+      }
     }
   };
 
@@ -926,6 +958,18 @@ export default function App() {
               currentUser={currentUser}
               onSubmitRefleksi={handleCreateRefleksi}
               onSubmitPenilaian={handleCreatePenilaian}
+              darkTheme={darkTheme}
+            />
+          )}
+
+          {currentTab === "prestasi" && (
+            <PrestasiView
+              prestasiList={prestasiList}
+              pesertaList={pesertaList}
+              userRole={userRole}
+              onCreate={handleCreatePrestasi}
+              onUpdate={handleUpdatePrestasi}
+              onDelete={handleDeletePrestasi}
               darkTheme={darkTheme}
             />
           )}

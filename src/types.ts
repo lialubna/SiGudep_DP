@@ -229,6 +229,8 @@ export interface Prestasi {
   Penyelenggara: string;
   Tanggal: string;
   Sertifikat?: string;
+  FotoKegiatan?: string;
+  Deskripsi?: string;
 }
 
 export interface Sertifikat {

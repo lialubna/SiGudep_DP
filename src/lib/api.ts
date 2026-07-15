@@ -7,7 +7,7 @@ import {
   AppConfig, User, Pembina, Peserta, MasterSKU, ProgressSKU, 
   TingkatHistory, TKKAward, AbsensiPeserta, AbsensiPembina, 
   Jadwal, KalenderKegiatan, Materi, Pengumuman, Notifikasi, 
-  Inventaris, RefleksiSiswa, RefleksiPembina, PenilaianSikap, LogAktivitas 
+  Inventaris, RefleksiSiswa, RefleksiPembina, PenilaianSikap, LogAktivitas, Prestasi 
 } from "../types";
 
 // Local Database Structure representing the Google Spreadsheet sheets
@@ -32,6 +32,7 @@ interface Database {
   refleksi_pembina: RefleksiPembina[];
   penilaian_sikap: PenilaianSikap[];
   log_aktivitas: LogAktivitas[];
+  prestasi: Prestasi[];
 }
 
 const defaultConfigs: AppConfig = {
@@ -67,7 +68,11 @@ function getDB(): Database {
   const cached = localStorage.getItem(DB_KEY);
   if (cached) {
     try {
-      return JSON.parse(cached);
+      const parsed = JSON.parse(cached);
+      if (!parsed.prestasi) {
+        parsed.prestasi = [];
+      }
+      return parsed;
     } catch (e) {
       console.error("Gagal membaca database offline:", e);
     }
@@ -92,7 +97,8 @@ function getDB(): Database {
     refleksi_siswa: [],
     refleksi_pembina: [],
     penilaian_sikap: [],
-    log_aktivitas: []
+    log_aktivitas: [],
+    prestasi: []
   };
   localStorage.setItem(DB_KEY, JSON.stringify(initDb));
   return initDb;
@@ -147,7 +153,7 @@ async function syncTableToGoogleSheets(table: keyof Database): Promise<void> {
   try {
     const response = await fetch(scriptURL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "text/plain" },
       body: JSON.stringify({
         action: "writeTable",
         table: table,
@@ -181,7 +187,7 @@ async function uploadToGoogleDriveIfBase64(base64Data: string, fileName: string)
 
     const response = await fetch(scriptURL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "text/plain" },
       body: JSON.stringify({
         action: "uploadFile",
         folderId: folderId,
@@ -193,8 +199,8 @@ async function uploadToGoogleDriveIfBase64(base64Data: string, fileName: string)
 
     if (response.ok) {
       const resData = await response.json();
-      if (resData && resData.success && resData.fileUrl) {
-        return resData.fileUrl;
+      if (resData && resData.success) {
+        return resData.url || resData.fileUrl || base64Data;
       }
     }
   } catch (err) {
@@ -336,7 +342,7 @@ export const API = {
 
     const response = await fetch(scriptURL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "text/plain" },
       body: JSON.stringify({ action: "setup" })
     });
 
@@ -1106,6 +1112,78 @@ export const API = {
     return { success: true };
   },
 
+  // Prestasi
+  async getPrestasi(): Promise<Prestasi[]> {
+    const db = getDB();
+    return db.prestasi || [];
+  },
+  async createPrestasi(data: Partial<Prestasi>): Promise<{ success: boolean; prestasi: Prestasi }> {
+    const db = getDB();
+    const newId = "prs-" + generateUUID().substring(0, 8);
+    
+    let sertifikatUrl = data.Sertifikat || "";
+    if (sertifikatUrl && sertifikatUrl.startsWith("data:")) {
+      sertifikatUrl = await uploadToGoogleDriveIfBase64(sertifikatUrl, "piagam_" + newId);
+    }
+
+    let fotoKegiatanUrl = data.FotoKegiatan || "";
+    if (fotoKegiatanUrl && fotoKegiatanUrl.startsWith("data:")) {
+      fotoKegiatanUrl = await uploadToGoogleDriveIfBase64(fotoKegiatanUrl, "kegiatan_" + newId);
+    }
+
+    const newPrestasi: Prestasi = {
+      PrestasiID: newId,
+      PesertaID: data.PesertaID || "",
+      NamaPrestasi: data.NamaPrestasi || "",
+      Tingkat: data.Tingkat || "Pangkalan",
+      Penyelenggara: data.Penyelenggara || "",
+      Tanggal: data.Tanggal || new Date().toISOString().split("T")[0],
+      Sertifikat: sertifikatUrl,
+      FotoKegiatan: fotoKegiatanUrl,
+      Deskripsi: data.Deskripsi || ""
+    };
+
+    db.prestasi = [...(db.prestasi || []), newPrestasi];
+    saveDB(db);
+    await syncTableToGoogleSheets("prestasi");
+    return { success: true, prestasi: newPrestasi };
+  },
+  async updatePrestasi(id: string, data: Partial<Prestasi>): Promise<{ success: boolean; prestasi: Prestasi }> {
+    const db = getDB();
+    const index = db.prestasi.findIndex(p => p.PrestasiID === id);
+    if (index === -1) throw new Error("Prestasi tidak ditemukan.");
+
+    const current = db.prestasi[index];
+    let sertifikatUrl = data.Sertifikat !== undefined ? data.Sertifikat : current.Sertifikat;
+    if (sertifikatUrl && sertifikatUrl.startsWith("data:")) {
+      sertifikatUrl = await uploadToGoogleDriveIfBase64(sertifikatUrl, "piagam_" + id);
+    }
+
+    let fotoKegiatanUrl = data.FotoKegiatan !== undefined ? data.FotoKegiatan : current.FotoKegiatan;
+    if (fotoKegiatanUrl && fotoKegiatanUrl.startsWith("data:")) {
+      fotoKegiatanUrl = await uploadToGoogleDriveIfBase64(fotoKegiatanUrl, "kegiatan_" + id);
+    }
+
+    const updated: Prestasi = {
+      ...current,
+      ...data,
+      Sertifikat: sertifikatUrl,
+      FotoKegiatan: fotoKegiatanUrl
+    };
+
+    db.prestasi[index] = updated;
+    saveDB(db);
+    await syncTableToGoogleSheets("prestasi");
+    return { success: true, prestasi: updated };
+  },
+  async deletePrestasi(id: string): Promise<{ success: boolean }> {
+    const db = getDB();
+    db.prestasi = (db.prestasi || []).filter(p => p.PrestasiID !== id);
+    saveDB(db);
+    await syncTableToGoogleSheets("prestasi");
+    return { success: true };
+  },
+
   // Backup / Restore
   async triggerRestore(backupData: any): Promise<{ success: boolean; message: string }> {
     if (backupData && backupData.config) {
@@ -1130,7 +1208,8 @@ export const API = {
         refleksi_siswa: backupData.refleksi || [],
         refleksi_pembina: backupData.refleksiPembina || [],
         penilaian_sikap: backupData.penilaian || [],
-        log_aktivitas: backupData.logs || []
+        log_aktivitas: backupData.logs || [],
+        prestasi: backupData.prestasi || []
       };
       saveDB(restored);
       
@@ -1138,7 +1217,7 @@ export const API = {
         "configs", "users", "pembina", "peserta", "master_sku", "progress_sku", 
         "tingkat", "tkk", "absensi_peserta", "absensi_pembina", "jadwal", "kalender", 
         "materi", "pengumuman", "notifikasi", "inventaris", "refleksi_siswa", 
-        "refleksi_pembina", "penilaian_sikap", "log_aktivitas"
+        "refleksi_pembina", "penilaian_sikap", "log_aktivitas", "prestasi"
       ];
       for (const t of tables) {
         syncTableToGoogleSheets(t).catch(e => console.error(`Failed to sync table on restore: ${t}`, e));

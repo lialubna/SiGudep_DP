@@ -856,7 +856,7 @@ function readAllSheets() {
     "configs", "users", "pembina", "peserta", "master_sku", "progress_sku", 
     "tingkat", "tkk", "absensi_peserta", "absensi_pembina", "jadwal", 
     "kalender", "materi", "pengumuman", "notifikasi", "inventaris", 
-    "refleksi_siswa", "refleksi_pembina", "penilaian_sikap", "log_aktivitas"
+    "refleksi_siswa", "refleksi_pembina", "penilaian_sikap", "log_aktivitas", "prestasi"
   ];
   
   var db = {};
@@ -984,7 +984,7 @@ function initializeSheets() {
     "configs", "users", "pembina", "peserta", "master_sku", "progress_sku", 
     "tingkat", "tkk", "absensi_peserta", "absensi_pembina", "jadwal", 
     "kalender", "materi", "pengumuman", "notifikasi", "inventaris", 
-    "refleksi_siswa", "refleksi_pembina", "penilaian_sikap", "log_aktivitas"
+    "refleksi_siswa", "refleksi_pembina", "penilaian_sikap", "log_aktivitas", "prestasi"
   ];
   
   tables.forEach(function(table) {
@@ -1042,6 +1042,8 @@ function getHeadersForTable(table) {
       return ["PenilaianID", "PesertaID", "PembinaID", "Periode", "Tanggal", "Disiplin", "TanggungJawab", "KerjaSama", "Kepemimpinan", "Kemandirian", "Keaktifan", "NilaiTotal", "NilaiRataRata", "Kategori", "Catatan", "CreatedAt", "UpdatedAt"];
     case "log_aktivitas":
       return ["LogID", "Tanggal", "Jam", "UserID", "Nama", "Role", "Modul", "Aktivitas", "DataID", "Keterangan"];
+    case "prestasi":
+      return ["PrestasiID", "PesertaID", "NamaPrestasi", "Tingkat", "Penyelenggara", "Tanggal", "Sertifikat", "FotoKegiatan", "Deskripsi"];
     default:
       return [];
   }
