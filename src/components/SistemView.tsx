@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { AppConfig, UserRole } from "../types";
 import { API } from "../lib/api";
+import { DATABASE_CONFIG } from "../config/database";
 
 interface SistemViewProps {
   userRole: UserRole;
@@ -496,194 +497,61 @@ export default function SistemView({
 
       {/* SUB TAB 2: INTEGRASI SPREADSHEET */}
       {subTab === "database" && (
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-          {/* Main setup form */}
-          <div className="xl:col-span-5 space-y-6">
-            <div className={`p-6 rounded-2xl border shadow-sm space-y-5
-              ${darkTheme ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-800"}`}
-            >
-              <div className="flex items-center gap-2">
-                <Database className="w-5 h-5 text-teal-500 animate-pulse" />
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Kredensial Google Workspace</h4>
+        <div className="grid grid-cols-1 max-w-3xl gap-6">
+          <div className={`p-8 rounded-3xl border shadow-lg space-y-6
+            ${darkTheme ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-800"}`}
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-teal-500/10 text-teal-500 rounded-2xl">
+                <Database className="w-6 h-6 animate-pulse" />
               </div>
-
-              {settingsSuccess && (
-                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 rounded-xl text-xs flex items-center gap-1.5">
-                  <CheckCircle className="w-4 h-4" /> Kredensial integrasi berhasil disimpan!
-                </div>
-              )}
-
-              {syncSuccessMessage && (
-                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 rounded-xl text-xs flex items-center gap-1.5">
-                  <CheckCircle className="w-4 h-4" /> {syncSuccessMessage}
-                </div>
-              )}
-
-              {syncErrorMessage && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-xs flex items-start gap-1.5 leading-relaxed">
-                  <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <span className="font-bold">Gagal Sinkronisasi</span>
-                    <p className="text-slate-400">{syncErrorMessage}</p>
-                  </div>
-                </div>
-              )}
-
-              {initSuccessMessage && (
-                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 rounded-xl text-xs flex items-center gap-1.5">
-                  <CheckCircle className="w-4 h-4" /> {initSuccessMessage}
-                </div>
-              )}
-
-              {initErrorMessage && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-xs flex items-start gap-1.5 leading-relaxed">
-                  <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <span className="font-bold">Gagal Inisialisasi</span>
-                    <p className="text-slate-400">{initErrorMessage}</p>
-                  </div>
-                </div>
-              )}
-
-              <form onSubmit={handleSaveSettings} className="space-y-4 text-xs">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-400">1. ID Google Spreadsheet</label>
-                  <input
-                    type="text"
-                    placeholder="Contoh: 1aBcDeFgHiJkLmNoPqRsTuVwXyZ"
-                    value={localConfig.SpreadsheetID}
-                    onChange={(e) => setLocalConfig(prev => ({ ...prev, SpreadsheetID: e.target.value }))}
-                    className={`w-full px-3 py-2 text-xs font-mono rounded-xl border focus:outline-none focus:ring-2 focus:ring-teal-500
-                      ${darkTheme ? "bg-slate-800 border-slate-700 text-white" : "bg-slate-50 border-slate-200"}`}
-                  />
-                  <p className="text-[10px] text-slate-400 leading-normal">
-                    ID unik dari berkas Spreadsheet di Google Drive Anda.
-                  </p>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-400">2. ID Folder Google Drive (Media Pasfoto)</label>
-                  <input
-                    type="text"
-                    placeholder="Contoh: 1XaYd-gHiJnLm_MoRqTs"
-                    value={localConfig.FolderDriveID}
-                    onChange={(e) => setLocalConfig(prev => ({ ...prev, FolderDriveID: e.target.value }))}
-                    className={`w-full px-3 py-2 text-xs font-mono rounded-xl border focus:outline-none focus:ring-2 focus:ring-teal-500
-                      ${darkTheme ? "bg-slate-800 border-slate-700 text-white" : "bg-slate-50 border-slate-200"}`}
-                  />
-                  <p className="text-[10px] text-slate-400 leading-normal">
-                    ID Folder Drive untuk menaruh unggahan foto profil siswa/pembina secara terpusat.
-                  </p>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-400">3. URL Web App Google Apps Script (Script URL)</label>
-                  <input
-                    type="url"
-                    placeholder="https://script.google.com/macros/s/.../exec"
-                    value={localConfig.ScriptURL}
-                    onChange={(e) => setLocalConfig(prev => ({ ...prev, ScriptURL: e.target.value }))}
-                    className={`w-full px-3 py-2 text-xs font-mono rounded-xl border focus:outline-none focus:ring-2 focus:ring-teal-500
-                      ${darkTheme ? "bg-slate-800 border-slate-700 text-white" : "bg-slate-50 border-slate-200"}`}
-                    required
-                  />
-                  <p className="text-[10px] text-slate-400 leading-normal">
-                    Alamat URL setelah mempublikasikan Apps Script sebagai Web App.
-                  </p>
-                </div>
-
-                {["SUPER_ADMIN", "ADMIN"].includes(userRole) && (
-                  <div className="flex flex-col gap-2 pt-2">
-                    <button
-                      type="submit"
-                      className="w-full py-2 bg-teal-500 hover:bg-teal-600 text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 shadow transition-all cursor-pointer"
-                    >
-                      <Save className="w-4 h-4" />
-                      <span>Simpan Kredensial Database</span>
-                    </button>
-                    
-                    <button
-                      type="button"
-                      disabled={initializing || !config.ScriptURL}
-                      onClick={triggerSheetsInitialize}
-                      className="w-full py-2 bg-slate-500/10 hover:bg-slate-500/20 text-slate-300 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 border border-slate-300/10 transition-all disabled:opacity-50 cursor-pointer"
-                    >
-                      {initializing ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Database className="w-4 h-4" />
-                      )}
-                      <span>Inisialisasi Tabel Sheet</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={syncing || !config.ScriptURL}
-                      onClick={triggerSheetsSync}
-                      className="w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 border border-emerald-500/25 transition-all disabled:opacity-50 cursor-pointer"
-                    >
-                      {syncing ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <ArrowLeftRight className="w-4 h-4 animate-spin" />
-                      )}
-                      <span>Sinkronisasi Data Sekarang</span>
-                    </button>
-                  </div>
-                )}
-              </form>
-            </div>
-          </div>
-
-          {/* Apps Script Code snippet */}
-          <div className="xl:col-span-7 space-y-6">
-            {/* Guide Card */}
-            <div className={`p-6 rounded-2xl border shadow-sm space-y-4
-              ${darkTheme ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-800"}`}
-            >
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Panduan Setup Apps Script (5 Langkah)</h4>
-              <ol className="text-xs space-y-3 pl-4 list-decimal text-slate-400 leading-relaxed font-sans">
-                <li>
-                  Buka file <strong className={darkTheme ? "text-white" : "text-slate-800"}>Google Spreadsheet</strong> Anda, kemudian klik menu <strong className={darkTheme ? "text-white" : "text-slate-800"}>Extensions (Ekstensi) &gt; Apps Script</strong>.
-                </li>
-                <li>
-                  Hapus semua kode bawaan di dalam editor, salin kode di bawah ini, lalu tempelkan seluruhnya ke editor Apps Script (<code className="text-teal-500 font-mono">code.gs</code>).
-                </li>
-                <li>
-                  Klik tombol <strong className={darkTheme ? "text-white" : "text-slate-800"}>Deploy &gt; New Deployment (Terapkan Baru)</strong> di bagian kanan atas editor Apps Script.
-                </li>
-                <li>
-                  Pilih tipe deployment <strong className="text-teal-500 font-bold">Web App (Aplikasi Web)</strong>. Konfigurasikan:
-                  <ul className="list-disc pl-5 mt-1 space-y-1 text-[11px]">
-                    <li>Execute as: <strong className={darkTheme ? "text-slate-200" : "text-slate-700"}>Me (Saya)</strong></li>
-                    <li>Who has access: <strong className="text-emerald-500">Anyone (Siapa saja)</strong></li>
-                  </ul>
-                </li>
-                <li>
-                  Klik <strong className={darkTheme ? "text-white" : "text-slate-800"}>Deploy</strong>, lalu salin alamat URL Aplikasi Web yang diberikan, masukkan ke kolom <strong className="text-teal-500 font-bold">Script URL</strong> di sebelah kiri dan klik Simpan.
-                </li>
-              </ol>
+              <div>
+                <h4 className="text-sm font-bold font-sans">Status Koneksi Database Google Spreadsheet</h4>
+                <p className="text-xs text-slate-400 mt-0.5">Integrasi awan pangkalan pangkalan pramuka Gudep Anda aktif secara real-time.</p>
+              </div>
             </div>
 
-            {/* Codeblock Card */}
-            <div className={`p-6 rounded-2xl border shadow-sm space-y-3
-              ${darkTheme ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-800"}`}
-            >
-              <div className="flex justify-between items-center">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Kode Google Apps Script (code.gs)</h4>
-                <button
-                  onClick={copyScriptToClipboard}
-                  className="text-teal-500 hover:text-teal-400 text-xs font-bold flex items-center gap-1 cursor-pointer"
+            <hr className={darkTheme ? "border-slate-800" : "border-slate-100"} />
+
+            <div className="space-y-4 text-xs">
+              <div className="space-y-1">
+                <span className="font-bold text-slate-400 block uppercase tracking-wider text-[9px]">ID Google Spreadsheet</span>
+                <div className={`px-4 py-3 font-mono rounded-xl border flex justify-between items-center
+                  ${darkTheme ? "bg-slate-950 border-slate-850 text-slate-300" : "bg-slate-50 border-slate-200 text-slate-700"}`}
                 >
-                  {copiedScript ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                  <span>{copiedScript ? "Tersalin!" : "Salin Kode"}</span>
-                </button>
+                  <span className="truncate pr-4">{DATABASE_CONFIG.SPREADSHEET_ID}</span>
+                  <span className="px-2 py-0.5 bg-teal-500/15 text-teal-500 text-[9px] font-bold rounded-lg shrink-0">TERKONFIGURASI</span>
+                </div>
               </div>
-              <div className="relative">
-                <pre className={`p-4 rounded-xl border font-mono text-[9px] max-h-80 overflow-y-auto leading-relaxed
-                  ${darkTheme ? "bg-slate-950 border-slate-850 text-slate-300" : "bg-slate-50 border-slate-200 text-slate-700"}`}>
-                  {googleAppsScriptCode}
-                </pre>
+
+              <div className="space-y-1">
+                <span className="font-bold text-slate-400 block uppercase tracking-wider text-[9px]">ID Folder Google Drive (Pasfoto Media)</span>
+                <div className={`px-4 py-3 font-mono rounded-xl border flex justify-between items-center
+                  ${darkTheme ? "bg-slate-950 border-slate-850 text-slate-300" : "bg-slate-50 border-slate-200 text-slate-700"}`}
+                >
+                  <span className="truncate pr-4">{DATABASE_CONFIG.FOLDER_ID}</span>
+                  <span className="px-2 py-0.5 bg-teal-500/15 text-teal-500 text-[9px] font-bold rounded-lg shrink-0">TERKONFIGURASI</span>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <span className="font-bold text-slate-400 block uppercase tracking-wider text-[9px]">URL Web App Google Apps Script</span>
+                <div className={`px-4 py-3 font-mono rounded-xl border flex justify-between items-center
+                  ${darkTheme ? "bg-slate-950 border-slate-850 text-slate-300" : "bg-slate-50 border-slate-200 text-slate-700"}`}
+                >
+                  <span className="truncate pr-4">{DATABASE_CONFIG.SCRIPT_URL}</span>
+                  <span className="px-2 py-0.5 bg-emerald-500/15 text-emerald-500 text-[9px] font-bold rounded-lg shrink-0">AKTIF / TERHUBUNG 🔒</span>
+                </div>
+              </div>
+            </div>
+
+            <div className={`p-4 rounded-2xl border text-xs leading-relaxed flex gap-2
+              ${darkTheme ? "bg-slate-950/45 border-slate-850 text-slate-400" : "bg-slate-50/50 border-slate-200 text-slate-600"}`}
+            >
+              <ShieldAlert className="w-5 h-5 text-teal-500 shrink-0 mt-0.5" />
+              <div>
+                <strong className={darkTheme ? "text-slate-200" : "text-slate-800"}>Pengaturan Database Dikunci:</strong><br />
+                Untuk alasan keamanan pangkalan dan kestabilan sistem multiuser, konfigurasi kredensial database spreadsheet telah diamankan dalam kode sumber aplikasi oleh pengembang di AI Studio. Pengguna umum tidak dapat mengubah setelan ini secara dinamis dari antarmuka sistem.
               </div>
             </div>
           </div>

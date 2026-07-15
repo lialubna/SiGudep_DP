@@ -1,3 +1,4 @@
+import { DATABASE_CONFIG } from "../config/database";
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -62,37 +63,47 @@ const defaultConfigs: AppConfig = {
   AlamatSekretariat: "Jl. Pendidikan No. 10, Jakarta"
 };
 
-const CONFIG_KEY = "sigudep_configs";
-
 let dbCache: Database | null = null;
 
-function getLocalConfigOnly(): AppConfig {
-  const cached = localStorage.getItem(CONFIG_KEY);
-  if (cached) {
-    try {
-      return JSON.parse(cached);
-    } catch (e) {
-      console.error("Gagal membaca konfigurasi lokal:", e);
-    }
+export async function writeTableToSpreadsheet(tableName: string, data: any) {
+  const scriptURL = DATABASE_CONFIG.SCRIPT_URL;
+  if (!scriptURL || !scriptURL.startsWith("https://script.google.com")) {
+    return;
   }
-  return defaultConfigs;
+  try {
+    const response = await fetch(scriptURL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({
+        action: "writeTable",
+        table: tableName,
+        data: data || []
+      })
+    });
+    if (!response.ok) {
+      console.error(`Gagal sinkronisasi tabel ${tableName} ke Google Sheets. Status: ${response.status}`);
+    } else {
+      await fetchSpreadsheetData();
+    }
+  } catch (err) {
+    console.error(`Kesalahan sinkronisasi tabel ${tableName}:`, err);
+  }
 }
 
-function saveLocalConfigOnly(config: AppConfig) {
-  localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+export async function saveDB(tableName: string, data: any) {
+  await writeTableToSpreadsheet(tableName, data);
 }
 
-function saveDB(db: Database) {
-  dbCache = db;
-  saveLocalConfigOnly(db.configs);
-}
-
-export async function refreshDBFromServer(): Promise<Database> {
-  const localConfig = getLocalConfigOnly();
-  const scriptURL = localConfig.ScriptURL;
+export async function fetchSpreadsheetData(): Promise<Database> {
+  const scriptURL = DATABASE_CONFIG.SCRIPT_URL;
 
   const initialDb: Database = {
-    configs: localConfig,
+    configs: {
+      ...defaultConfigs,
+      ScriptURL: DATABASE_CONFIG.SCRIPT_URL,
+      SpreadsheetID: DATABASE_CONFIG.SPREADSHEET_ID,
+      FolderDriveID: DATABASE_CONFIG.FOLDER_ID
+    },
     users: [],
     pembina: [],
     peserta: [],
@@ -121,10 +132,13 @@ export async function refreshDBFromServer(): Promise<Database> {
       if (response.ok) {
         const remoteDB = await response.json() as any;
         if (remoteDB) {
-          const mergedDB: Database = {
+          dbCache = {
             configs: {
-              ...localConfig,
-              ...(remoteDB.configs || {})
+              ...defaultConfigs,
+              ...(remoteDB.configs || {}),
+              ScriptURL: DATABASE_CONFIG.SCRIPT_URL,
+              SpreadsheetID: DATABASE_CONFIG.SPREADSHEET_ID,
+              FolderDriveID: DATABASE_CONFIG.FOLDER_ID
             },
             users: remoteDB.users || [],
             pembina: remoteDB.pembina || [],
@@ -147,11 +161,6 @@ export async function refreshDBFromServer(): Promise<Database> {
             log_aktivitas: remoteDB.log_aktivitas || [],
             prestasi: remoteDB.prestasi || []
           };
-          mergedDB.configs.ScriptURL = scriptURL;
-          mergedDB.configs.SpreadsheetID = localConfig.SpreadsheetID || mergedDB.configs.SpreadsheetID;
-          mergedDB.configs.FolderDriveID = localConfig.FolderDriveID || mergedDB.configs.FolderDriveID;
-          
-          dbCache = mergedDB;
           return dbCache;
         }
       }
@@ -163,16 +172,18 @@ export async function refreshDBFromServer(): Promise<Database> {
   if (!dbCache) {
     dbCache = initialDb;
   } else {
-    dbCache.configs = localConfig;
+    dbCache.configs.ScriptURL = DATABASE_CONFIG.SCRIPT_URL;
+    dbCache.configs.SpreadsheetID = DATABASE_CONFIG.SPREADSHEET_ID;
+    dbCache.configs.FolderDriveID = DATABASE_CONFIG.FOLDER_ID;
   }
   return dbCache;
 }
 
+export async function refreshDBFromServer(): Promise<Database> {
+  return await fetchSpreadsheetData();
+}
 async function getDB(): Promise<Database> {
-  if (dbCache) {
-    return dbCache;
-  }
-  return await refreshDBFromServer();
+  return await fetchSpreadsheetData();
 }
 
 // SHA256 helper for password hashing (runs natively in browser)
@@ -204,44 +215,12 @@ function writeLog(db: Database, userId: string, nama: string, role: string, modu
   db.log_aktivitas = [newLog, ...(db.log_aktivitas || [])];
 }
 
-// Background syncing helper to Google Sheets
-async function syncTableToGoogleSheets(table: keyof Database): Promise<void> {
-  const db = await getDB();
-  const scriptURL = db.configs.ScriptURL;
-  if (!scriptURL || !scriptURL.startsWith("https://script.google.com")) {
-    return;
-  }
-
-  let tableData: any = db[table];
-  if (table === "configs") {
-    tableData = [db.configs]; // configs is stored as a single row array
-  }
-
-  try {
-    const response = await fetch(scriptURL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain" },
-      body: JSON.stringify({
-        action: "writeTable",
-        table: table,
-        data: tableData || []
-      })
-    });
-    if (!response.ok) {
-      console.error(`Gagal sinkronisasi tabel ${table} ke Google Sheets. Status: ${response.status}`);
-    } else {
-      await refreshDBFromServer();
-    }
-  } catch (err) {
-    console.error(`Kesalahan sinkronisasi tabel ${table}:`, err);
-  }
-}
 
 // Upload base64 files directly to Google Drive via Apps Script
 async function uploadToGoogleDriveIfBase64(base64Data: string, fileName: string): Promise<string> {
   const db = await getDB();
-  const scriptURL = db.configs.ScriptURL;
-  const folderId = db.configs.FolderDriveID;
+  const scriptURL = DATABASE_CONFIG.SCRIPT_URL;
+  const folderId = DATABASE_CONFIG.FOLDER_ID;
   if (!scriptURL || !scriptURL.startsWith("https://script.google.com")) {
     return base64Data;
   }
@@ -279,6 +258,10 @@ async function uploadToGoogleDriveIfBase64(base64Data: string, fileName: string)
 }
 
 export const API = {
+  // Refresh DB from Spreadsheet server
+  async refreshDBFromServer(): Promise<Database> {
+    return await refreshDBFromServer();
+  },
   // Setup database
   async setupDB(): Promise<{ success: boolean; message: string }> {
     await getDB();
@@ -307,11 +290,10 @@ export const API = {
 
     user.LastLogin = new Date().toISOString();
     writeLog(db, user.UserID, user.NamaLengkap, user.Role, "Auth", "Login", user.UserID, `${user.NamaLengkap} berhasil login.`);
-    saveDB(db);
-    
-    // Sync tables on background
-    syncTableToGoogleSheets("users").catch(console.error);
-    syncTableToGoogleSheets("log_aktivitas").catch(console.error);
+    await Promise.all([
+      saveDB("users", db.users),
+      saveDB("log_aktivitas", db.log_aktivitas)
+    ]);
 
     return {
       success: true,
@@ -348,64 +330,16 @@ export const API = {
       ...updated,
       UpdatedAt: new Date().toISOString()
     };
-    saveDB(db);
-
-    if (db.configs.ScriptURL && db.configs.ScriptURL !== oldScriptURL && db.configs.ScriptURL.startsWith("https://script.google.com")) {
-      try {
-        const response = await fetch(`${db.configs.ScriptURL}?action=read`);
-        if (response.ok) {
-          const remoteDB = await response.json() as any;
-          if (remoteDB && remoteDB.configs) {
-            const mergedDB = {
-              ...db,
-              ...remoteDB
-            };
-            mergedDB.configs.ScriptURL = db.configs.ScriptURL;
-            mergedDB.configs.SpreadsheetID = db.configs.SpreadsheetID || mergedDB.configs.SpreadsheetID;
-            mergedDB.configs.FolderDriveID = db.configs.FolderDriveID || mergedDB.configs.FolderDriveID;
-            saveDB(mergedDB);
-          }
-        }
-      } catch (err) {
-        console.error("Gagal menarik data awal dari Spreadsheet baru:", err);
-      }
-    } else {
-      await syncTableToGoogleSheets("configs");
-    }
+    await saveDB("configs", [db.configs]);
 
     return { success: true, configs: db.configs };
   },
   async syncGoogleSheets(): Promise<{ success: boolean; message: string; configs?: AppConfig }> {
-    const db = await getDB();
-    const scriptURL = db.configs.ScriptURL;
-    if (!scriptURL || !scriptURL.startsWith("https://script.google.com")) {
-      throw new Error("Apps Script Web App URL belum dikonfigurasi di pengaturan sistem!");
-    }
-
-    const response = await fetch(`${scriptURL}?action=read`);
-    if (!response.ok) {
-      throw new Error(`Apps Script mengembalikan status ${response.status}`);
-    }
-    
-    const remoteDB = await response.json() as any;
-    if (remoteDB && remoteDB.configs) {
-      const localDB = await getDB();
-      const mergedDB = {
-        ...localDB,
-        ...remoteDB
-      };
-      // Tetap pertahankan setelan lokal koneksi webapp
-      mergedDB.configs.ScriptURL = db.configs.ScriptURL;
-      mergedDB.configs.SpreadsheetID = db.configs.SpreadsheetID || mergedDB.configs.SpreadsheetID;
-      mergedDB.configs.FolderDriveID = db.configs.FolderDriveID || mergedDB.configs.FolderDriveID;
-      saveDB(mergedDB);
-      return { success: true, message: "Koneksi berhasil! Seluruh data disinkronkan dua arah.", configs: mergedDB.configs };
-    }
-    throw new Error("Format respons Google Sheets tidak valid.");
+    const db = await refreshDBFromServer();
+    return { success: true, message: "Koneksi berhasil! Seluruh data disinkronkan dua arah.", configs: db.configs };
   },
   async initializeGoogleSheets(): Promise<{ success: boolean; message: string }> {
-    const db = await getDB();
-    const scriptURL = db.configs.ScriptURL;
+    const scriptURL = DATABASE_CONFIG.SCRIPT_URL;
     if (!scriptURL || !scriptURL.startsWith("https://script.google.com")) {
       throw new Error("Apps Script Web App URL belum dikonfigurasi di pengaturan sistem!");
     }
@@ -454,8 +388,7 @@ export const API = {
     };
     
     db.users = [...(db.users || []), newUser];
-    saveDB(db);
-    await syncTableToGoogleSheets("users");
+    await saveDB("users", db.users);
     return { success: true, user: newUser };
   },
   async updateUser(id: string, user: Partial<User>): Promise<{ success: boolean; user: User }> {
@@ -475,15 +408,13 @@ export const API = {
     }
     
     db.users[index] = updated;
-    saveDB(db);
-    await syncTableToGoogleSheets("users");
+    await saveDB("users", db.users);
     return { success: true, user: updated };
   },
   async deleteUser(id: string): Promise<{ success: boolean }> {
     const db = await getDB();
     db.users = db.users.filter(u => u.UserID !== id);
-    saveDB(db);
-    await syncTableToGoogleSheets("users");
+    await saveDB("users", db.users);
     return { success: true };
   },
 
@@ -530,10 +461,9 @@ export const API = {
 
     db.pembina = [...(db.pembina || []), newPembina];
     db.users = [...(db.users || []), newUser];
-    saveDB(db);
     await Promise.all([
-      syncTableToGoogleSheets("pembina"),
-      syncTableToGoogleSheets("users")
+      saveDB("pembina", db.pembina),
+      saveDB("users", db.users)
     ]);
     return { success: true, pembina: newPembina };
   },
@@ -561,10 +491,9 @@ export const API = {
       return u;
     });
 
-    saveDB(db);
     await Promise.all([
-      syncTableToGoogleSheets("pembina"),
-      syncTableToGoogleSheets("users")
+      saveDB("pembina", db.pembina),
+      saveDB("users", db.users)
     ]);
     return { success: true, pembina: updated };
   },
@@ -572,10 +501,9 @@ export const API = {
     const db = await getDB();
     db.pembina = db.pembina.filter(p => p.PembinaID !== id);
     db.users = db.users.filter(u => u.PembinaID !== id);
-    saveDB(db);
     await Promise.all([
-      syncTableToGoogleSheets("pembina"),
-      syncTableToGoogleSheets("users")
+      saveDB("pembina", db.pembina),
+      saveDB("users", db.users)
     ]);
     return { success: true };
   },
@@ -640,10 +568,9 @@ export const API = {
 
     db.peserta = [...(db.peserta || []), newPeserta];
     db.users = [...(db.users || []), newUser];
-    saveDB(db);
     await Promise.all([
-      syncTableToGoogleSheets("peserta"),
-      syncTableToGoogleSheets("users")
+      saveDB("peserta", db.peserta),
+      saveDB("users", db.users)
     ]);
     return { success: true, peserta: newPeserta };
   },
@@ -678,10 +605,9 @@ export const API = {
       return u;
     });
 
-    saveDB(db);
     await Promise.all([
-      syncTableToGoogleSheets("peserta"),
-      syncTableToGoogleSheets("users")
+      saveDB("peserta", db.peserta),
+      saveDB("users", db.users)
     ]);
     return { success: true, peserta: updated };
   },
@@ -689,10 +615,9 @@ export const API = {
     const db = await getDB();
     db.peserta = db.peserta.filter(p => p.PesertaID !== id);
     db.users = db.users.filter(u => u.PesertaID !== id);
-    saveDB(db);
     await Promise.all([
-      syncTableToGoogleSheets("peserta"),
-      syncTableToGoogleSheets("users")
+      saveDB("peserta", db.peserta),
+      saveDB("users", db.users)
     ]);
     return { success: true };
   },
@@ -716,8 +641,7 @@ export const API = {
       Status: data.Status || "Aktif"
     };
     db.master_sku = [...(db.master_sku || []), newSku];
-    saveDB(db);
-    await syncTableToGoogleSheets("master_sku");
+    await saveDB("master_sku", db.master_sku);
     return { success: true, sku: newSku };
   },
   async updateMasterSKU(id: string, data: Partial<MasterSKU>): Promise<{ success: boolean; sku: MasterSKU }> {
@@ -726,15 +650,13 @@ export const API = {
     if (index === -1) throw new Error("Butir SKU tidak ditemukan.");
     const updated = { ...db.master_sku[index], ...data };
     db.master_sku[index] = updated;
-    saveDB(db);
-    await syncTableToGoogleSheets("master_sku");
+    await saveDB("master_sku", db.master_sku);
     return { success: true, sku: updated };
   },
   async deleteMasterSKU(id: string): Promise<{ success: boolean }> {
     const db = await getDB();
     db.master_sku = db.master_sku.filter(s => s.SkuID !== id);
-    saveDB(db);
-    await syncTableToGoogleSheets("master_sku");
+    await saveDB("master_sku", db.master_sku);
     return { success: true };
   },
 
@@ -767,8 +689,7 @@ export const API = {
       db.progress_sku = [...(db.progress_sku || []), progressData];
     }
 
-    saveDB(db);
-    await syncTableToGoogleSheets("progress_sku");
+    await saveDB("progress_sku", db.progress_sku);
     return { success: true, progress: progressData };
   },
 
@@ -792,15 +713,13 @@ export const API = {
       Catatan: data.Catatan || ""
     };
     db.tkk = [...(db.tkk || []), newAward];
-    saveDB(db);
-    await syncTableToGoogleSheets("tkk");
+    await saveDB("tkk", db.tkk);
     return { success: true, tkk: newAward };
   },
   async deleteTKK(id: string): Promise<{ success: boolean }> {
     const db = await getDB();
     db.tkk = db.tkk.filter(t => t.TKKID !== id);
-    saveDB(db);
-    await syncTableToGoogleSheets("tkk");
+    await saveDB("tkk", db.tkk);
     return { success: true };
   },
 
@@ -834,10 +753,9 @@ export const API = {
     });
 
     db.tingkat = [...(db.tingkat || []), newHistory];
-    saveDB(db);
     await Promise.all([
-      syncTableToGoogleSheets("tingkat"),
-      syncTableToGoogleSheets("peserta")
+      saveDB("tingkat", db.tingkat),
+      saveDB("peserta", db.peserta)
     ]);
     return { success: true, tingkat: newHistory };
   },
@@ -862,8 +780,7 @@ export const API = {
       PembinaID: data.PembinaID || ""
     };
     db.absensi_peserta = [...(db.absensi_peserta || []), newAbsensi];
-    saveDB(db);
-    await syncTableToGoogleSheets("absensi_peserta");
+    await saveDB("absensi_peserta", db.absensi_peserta);
     return { success: true, absensi: newAbsensi };
   },
   async getAbsensiPembina(): Promise<AbsensiPembina[]> {
@@ -884,8 +801,7 @@ export const API = {
       Lokasi: data.Lokasi || ""
     };
     db.absensi_pembina = [...(db.absensi_pembina || []), newAbsensi];
-    saveDB(db);
-    await syncTableToGoogleSheets("absensi_pembina");
+    await saveDB("absensi_pembina", db.absensi_pembina);
     return { success: true, absensi: newAbsensi };
   },
 
@@ -907,15 +823,13 @@ export const API = {
       CreatedBy: data.CreatedBy || "Admin"
     };
     db.jadwal = [...(db.jadwal || []), newJadwal];
-    saveDB(db);
-    await syncTableToGoogleSheets("jadwal");
+    await saveDB("jadwal", db.jadwal);
     return { success: true, jadwal: newJadwal };
   },
   async deleteJadwal(id: string): Promise<{ success: boolean }> {
     const db = await getDB();
     db.jadwal = db.jadwal.filter(j => j.JadwalID !== id);
-    saveDB(db);
-    await syncTableToGoogleSheets("jadwal");
+    await saveDB("jadwal", db.jadwal);
     return { success: true };
   },
 
@@ -936,15 +850,13 @@ export const API = {
       Keterangan: data.Keterangan || ""
     };
     db.kalender = [...(db.kalender || []), newKalender];
-    saveDB(db);
-    await syncTableToGoogleSheets("kalender");
+    await saveDB("kalender", db.kalender);
     return { success: true, kalender: newKalender };
   },
   async deleteKalender(id: string): Promise<{ success: boolean }> {
     const db = await getDB();
     db.kalender = db.kalender.filter(k => k.KalenderID !== id);
-    saveDB(db);
-    await syncTableToGoogleSheets("kalender");
+    await saveDB("kalender", db.kalender);
     return { success: true };
   },
 
@@ -967,15 +879,13 @@ export const API = {
       PembinaID: data.PembinaID || ""
     };
     db.materi = [...(db.materi || []), newMateri];
-    saveDB(db);
-    await syncTableToGoogleSheets("materi");
+    await saveDB("materi", db.materi);
     return { success: true, materi: newMateri };
   },
   async deleteMateri(id: string): Promise<{ success: boolean }> {
     const db = await getDB();
     db.materi = db.materi.filter(m => m.MateriID !== id);
-    saveDB(db);
-    await syncTableToGoogleSheets("materi");
+    await saveDB("materi", db.materi);
     return { success: true };
   },
 
@@ -1009,18 +919,16 @@ export const API = {
     db.pengumuman = [...(db.pengumuman || []), newPengumuman];
     db.notifikasi = [...newNotifs, ...(db.notifikasi || [])];
 
-    saveDB(db);
     await Promise.all([
-      syncTableToGoogleSheets("pengumuman"),
-      syncTableToGoogleSheets("notifikasi")
+      saveDB("pengumuman", db.pengumuman),
+      saveDB("notifikasi", db.notifikasi)
     ]);
     return { success: true, pengumuman: newPengumuman };
   },
   async deletePengumuman(id: string): Promise<{ success: boolean }> {
     const db = await getDB();
     db.pengumuman = db.pengumuman.filter(p => p.PengumumanID !== id);
-    saveDB(db);
-    await syncTableToGoogleSheets("pengumuman");
+    await saveDB("pengumuman", db.pengumuman);
     return { success: true };
   },
 
@@ -1045,8 +953,7 @@ export const API = {
       Keterangan: data.Keterangan || ""
     };
     db.inventaris = [...(db.inventaris || []), newInventaris];
-    saveDB(db);
-    await syncTableToGoogleSheets("inventaris");
+    await saveDB("inventaris", db.inventaris);
     return { success: true, inventaris: newInventaris };
   },
   async updateInventaris(id: string, data: Partial<Inventaris>): Promise<{ success: boolean; inventaris: Inventaris }> {
@@ -1055,15 +962,13 @@ export const API = {
     if (index === -1) throw new Error("Barang tidak ditemukan.");
     const updated = { ...db.inventaris[index], ...data };
     db.inventaris[index] = updated;
-    saveDB(db);
-    await syncTableToGoogleSheets("inventaris");
+    await saveDB("inventaris", db.inventaris);
     return { success: true, inventaris: updated };
   },
   async deleteInventaris(id: string): Promise<{ success: boolean }> {
     const db = await getDB();
     db.inventaris = db.inventaris.filter(i => i.InventarisID !== id);
-    saveDB(db);
-    await syncTableToGoogleSheets("inventaris");
+    await saveDB("inventaris", db.inventaris);
     return { success: true };
   },
 
@@ -1083,8 +988,7 @@ export const API = {
       Lampiran: data.Lampiran || ""
     };
     db.refleksi_siswa = [...(db.refleksi_siswa || []), newRefleksi];
-    saveDB(db);
-    await syncTableToGoogleSheets("refleksi_siswa");
+    await saveDB("refleksi_siswa", db.refleksi_siswa);
     return { success: true, refleksi: newRefleksi };
   },
   async getRefleksiPembina(): Promise<RefleksiPembina[]> {
@@ -1102,8 +1006,7 @@ export const API = {
       Isi: data.Isi || ""
     };
     db.refleksi_pembina = [...(db.refleksi_pembina || []), newRefleksi];
-    saveDB(db);
-    await syncTableToGoogleSheets("refleksi_pembina");
+    await saveDB("refleksi_pembina", db.refleksi_pembina);
     return { success: true, refleksi: newRefleksi };
   },
 
@@ -1153,8 +1056,7 @@ export const API = {
       UpdatedAt: new Date().toISOString()
     };
     db.penilaian_sikap = [...(db.penilaian_sikap || []), newPenilaian];
-    saveDB(db);
-    await syncTableToGoogleSheets("penilaian_sikap");
+    await saveDB("penilaian_sikap", db.penilaian_sikap);
     return { success: true, penilaian: newPenilaian };
   },
 
@@ -1177,8 +1079,7 @@ export const API = {
       }
       return n;
     });
-    saveDB(db);
-    await syncTableToGoogleSheets("notifikasi");
+    await saveDB("notifikasi", db.notifikasi);
     return { success: true };
   },
 
@@ -1214,8 +1115,7 @@ export const API = {
     };
 
     db.prestasi = [...(db.prestasi || []), newPrestasi];
-    saveDB(db);
-    await syncTableToGoogleSheets("prestasi");
+    await saveDB("prestasi", db.prestasi);
     return { success: true, prestasi: newPrestasi };
   },
   async updatePrestasi(id: string, data: Partial<Prestasi>): Promise<{ success: boolean; prestasi: Prestasi }> {
@@ -1242,15 +1142,13 @@ export const API = {
     };
 
     db.prestasi[index] = updated;
-    saveDB(db);
-    await syncTableToGoogleSheets("prestasi");
+    await saveDB("prestasi", db.prestasi);
     return { success: true, prestasi: updated };
   },
   async deletePrestasi(id: string): Promise<{ success: boolean }> {
     const db = await getDB();
     db.prestasi = (db.prestasi || []).filter(p => p.PrestasiID !== id);
-    saveDB(db);
-    await syncTableToGoogleSheets("prestasi");
+    await saveDB("prestasi", db.prestasi);
     return { success: true };
   },
 
@@ -1281,7 +1179,6 @@ export const API = {
         log_aktivitas: backupData.logs || [],
         prestasi: backupData.prestasi || []
       };
-      saveDB(restored);
       
       const tables: (keyof Database)[] = [
         "configs", "users", "pembina", "peserta", "master_sku", "progress_sku", 
@@ -1290,7 +1187,7 @@ export const API = {
         "refleksi_pembina", "penilaian_sikap", "log_aktivitas", "prestasi"
       ];
       for (const t of tables) {
-        syncTableToGoogleSheets(t).catch(e => console.error(`Failed to sync table on restore: ${t}`, e));
+        saveDB(t, (restored as any)[t]).catch(e => console.error(`Failed to sync table on restore: ${t}`, e));
       }
 
       return { success: true, message: "Berhasil memulihkan data!" };
