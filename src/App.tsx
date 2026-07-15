@@ -99,6 +99,20 @@ export default function App() {
       }
     } catch (err: any) {
       console.error("Kesalahan koneksi database Spreadsheet:", err);
+      const cached = localStorage.getItem("sigudep_configs");
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (parsed && parsed.configs) {
+            setAppConfig(parsed.configs);
+            setScriptUrlInput(parsed.configs.ScriptURL || "");
+            setConnectionStatus({ status: "success", errorMsg: "" });
+            return;
+          }
+        } catch (e) {
+          console.error("Gagal mem-parse cache lokal:", e);
+        }
+      }
       setConnectionStatus({
         status: "error",
         errorMsg: err.message || "Gagal terhubung ke Google Apps Script."
@@ -121,6 +135,20 @@ export default function App() {
         }
       } catch (err: any) {
         console.error("Kesalahan koneksi database Spreadsheet:", err);
+        const cached = localStorage.getItem("sigudep_configs");
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            if (parsed && parsed.configs) {
+              setAppConfig(parsed.configs);
+              setScriptUrlInput(parsed.configs.ScriptURL || "");
+              setConnectionStatus({ status: "success", errorMsg: "" });
+              return;
+            }
+          } catch (e) {
+            console.error("Gagal mem-parse cache lokal:", e);
+          }
+        }
         setConnectionStatus({
           status: "error",
           errorMsg: err.message || "Gagal terhubung ke Google Apps Script. Pastikan Web App URL Apps Script Anda aktif!"

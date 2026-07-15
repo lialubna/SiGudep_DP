@@ -64,6 +64,27 @@ const defaultConfigs: AppConfig = {
 };
 
 let dbCache: Database | null = null;
+const CONFIG_KEY = "sigudep_configs";
+
+function saveLocalDB(db: Database) {
+  try {
+    localStorage.setItem(CONFIG_KEY, JSON.stringify(db));
+  } catch (err) {
+    console.error("Gagal menyimpan ke localStorage:", err);
+  }
+}
+
+function getLocalDB(): Database | null {
+  try {
+    const data = localStorage.getItem(CONFIG_KEY);
+    if (data) {
+      return JSON.parse(data) as Database;
+    }
+  } catch (err) {
+    console.error("Gagal membaca dari localStorage:", err);
+  }
+  return null;
+}
 
 export async function writeTableToSpreadsheet(tableName: string, data: any) {
   const scriptURL = DATABASE_CONFIG.SCRIPT_URL;
@@ -82,8 +103,6 @@ export async function writeTableToSpreadsheet(tableName: string, data: any) {
     });
     if (!response.ok) {
       console.error(`Gagal sinkronisasi tabel ${tableName} ke Google Sheets. Status: ${response.status}`);
-    } else {
-      await fetchSpreadsheetData();
     }
   } catch (err) {
     console.error(`Kesalahan sinkronisasi tabel ${tableName}:`, err);
@@ -91,7 +110,15 @@ export async function writeTableToSpreadsheet(tableName: string, data: any) {
 }
 
 export async function saveDB(tableName: string, data: any) {
-  await writeTableToSpreadsheet(tableName, data);
+  const db = await getDB();
+  if (tableName === "configs") {
+    db.configs = Array.isArray(data) ? data[0] : data;
+  } else {
+    (db as any)[tableName] = data;
+  }
+  saveLocalDB(db);
+  // Kirim sinkronisasi ke latar belakang
+  return writeTableToSpreadsheet(tableName, data);
 }
 
 export async function fetchSpreadsheetData(): Promise<Database> {
@@ -161,6 +188,7 @@ export async function fetchSpreadsheetData(): Promise<Database> {
             log_aktivitas: remoteDB.log_aktivitas || [],
             prestasi: remoteDB.prestasi || []
           };
+          saveLocalDB(dbCache);
           return dbCache;
         }
       }
@@ -170,20 +198,33 @@ export async function fetchSpreadsheetData(): Promise<Database> {
   }
   
   if (!dbCache) {
-    dbCache = initialDb;
-  } else {
-    dbCache.configs.ScriptURL = DATABASE_CONFIG.SCRIPT_URL;
-    dbCache.configs.SpreadsheetID = DATABASE_CONFIG.SPREADSHEET_ID;
-    dbCache.configs.FolderDriveID = DATABASE_CONFIG.FOLDER_ID;
+    const local = getLocalDB();
+    dbCache = local || initialDb;
   }
+  
+  dbCache.configs.ScriptURL = DATABASE_CONFIG.SCRIPT_URL;
+  dbCache.configs.SpreadsheetID = DATABASE_CONFIG.SPREADSHEET_ID;
+  dbCache.configs.FolderDriveID = DATABASE_CONFIG.FOLDER_ID;
   return dbCache;
 }
 
 export async function refreshDBFromServer(): Promise<Database> {
   return await fetchSpreadsheetData();
 }
+
 async function getDB(): Promise<Database> {
-  return await fetchSpreadsheetData();
+  if (!dbCache) {
+    const local = getLocalDB();
+    if (local) {
+      dbCache = local;
+    } else {
+      dbCache = await fetchSpreadsheetData();
+    }
+  }
+  dbCache.configs.ScriptURL = DATABASE_CONFIG.SCRIPT_URL;
+  dbCache.configs.SpreadsheetID = DATABASE_CONFIG.SPREADSHEET_ID;
+  dbCache.configs.FolderDriveID = DATABASE_CONFIG.FOLDER_ID;
+  return dbCache;
 }
 
 // SHA256 helper for password hashing (runs natively in browser)
